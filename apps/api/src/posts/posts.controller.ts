@@ -20,6 +20,14 @@ export class PostsController {
   /**
    * Get public feed
    */
+  @Get('saved')
+  async getSavedPosts(@Req() req: any) {
+    const userId = req.user?.id;
+    if (!userId) throw new BadRequestException('User not authenticated');
+    const posts = await this.postsService.getSavedPosts(userId);
+    return { posts };
+  }
+
   @Get()
   async getFeed(
     @Query('skip') skip: string = '0',
