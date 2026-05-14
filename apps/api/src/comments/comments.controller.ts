@@ -24,14 +24,17 @@ export class CommentsController {
     @Req() req: any,
   ) {
     const userId = req.user?.id;
-    if (!userId) {
-      throw new BadRequestException('User not authenticated');
+    if (!userId) throw new BadRequestException('User not authenticated');
+
+    // Validate required fields
+    if (!data.postId || !data.content?.trim()) {
+      throw new BadRequestException('postId and content are required');
     }
 
     const comment = await this.commentsService.createComment(
       data.postId,
       userId,
-      data.content,
+      data.content.trim(),
     );
     return { comment };
   }
