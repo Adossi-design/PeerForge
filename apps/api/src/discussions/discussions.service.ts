@@ -6,91 +6,75 @@ import { SendMessageDto } from './dto/message.dto';
 export class DiscussionsService {
   constructor(private prisma: PrismaService) {}
 
+  async getAllDiscussions(skip = 0, take = 20) {
+    return this.prisma.discussion.findMany({
+      skip,
+      take,
+      orderBy: { updatedAt: 'desc' },
+      select: {
+        id: true,
+        name: true,
+        description: true,
+        type: true,
+        memberCount: true,
+        messageCount: true,
+        updatedAt: true,
+        post: { select: { id: true, title: true } },
+      },
+    });
+  }
+
+  async getDiscussionById(id: string) {
+    const discussion = await this.prisma.discussion.findUnique({
+      where: { id },
+      include: { members: true },
+    });
+    if (!discussion) throw new NotFoundException('Discussion not found');
+    return discussion;
+  }
+
   async getDiscussionByPostId(postId: string) {
     const discussion = await this.prisma.discussion.findUnique({
       where: { postId },
-      include: {
-        members: true,
-      },
+      include: { members: true },
     });
-
-    if (!discussion) {
-      throw new NotFoundException('Discussion not found');
-    }
-
+    if (!discussion) throw new NotFoundException('Discussion not found');
     return discussion;
   }
 
   async joinDiscussion(discussionId: string, userId: string) {
-    // Check if already a member
-    const existingMember = await this.prisma.discussionMember.findUnique({
-      where: {
-        discussionId_userId: {
-          discussionId,
-          userId,
-        },
-      },
+    const existing = await this.prisma.discussionMember.findUnique({
+      where: { discussionId_userId: { discussionId, userId } },
     });
-
-    if (existingMember) {
-      return existingMember;
-    }
+    if (existing) return existing;
 
     const member = await this.prisma.discussionMember.create({
-      data: {
-        discussionId,
-        userId,
-      },
+      data: { discussionId, userId },
     });
-
-    // Update member count
     await this.prisma.discussion.update({
       where: { id: discussionId },
       data: { memberCount: { increment: 1 } },
     });
-
     return member;
   }
 
   async leaveDiscussion(discussionId: string, userId: string) {
     await this.prisma.discussionMember.delete({
-      where: {
-        discussionId_userId: {
-          discussionId,
-          userId,
-        },
-      },
-    });
-
-    // Update member count
+      where: { discussionId_userId: { discussionId, userId } },
+    }).catch(() => {});
     await this.prisma.discussion.update({
       where: { id: discussionId },
       data: { memberCount: { decrement: 1 } },
     });
-
     return { success: true };
   }
 
-  async sendMessage(
-    discussionId: string,
-    userId: string,
-    data: SendMessageDto,
-  ) {
-    // Verify user is member of discussion
+  async sendMessage(discussionId: string, userId: string, data: SendMessageDto) {
     const member = await this.prisma.discussionMember.findUnique({
-      where: {
-        discussionId_userId: {
-          discussionId,
-          userId,
-        },
-      },
+      where: { discussionId_userId: { discussionId, userId } },
     });
+    if (!member) throw new NotFoundException('User is not a member of this discussion');
 
-    if (!member) {
-      throw new NotFoundException('User is not a member of this discussion');
-    }
-
-    // Create message
     const message = await this.prisma.message.create({
       data: {
         discussionId,
@@ -98,28 +82,15 @@ export class DiscussionsService {
         content: data.content,
         type: data.codeLanguage ? 'CODE' : 'TEXT',
         codeBlock: data.codeLanguage
-          ? {
-              create: {
-                language: data.codeLanguage,
-                code: data.codeContent || '',
-                filename: data.codeFilename,
-              },
-            }
+          ? { create: { language: data.codeLanguage, code: data.codeContent || '', filename: data.codeFilename } }
           : undefined,
       },
       include: {
-        author: {
-          select: {
-            id: true,
-            username: true,
-            avatarUrl: true,
-          },
-        },
+        author: { select: { id: true, username: true, avatarUrl: true } },
         codeBlock: true,
       },
     });
 
-    // Update message count
     await this.prisma.discussion.update({
       where: { id: discussionId },
       data: { messageCount: { increment: 1 } },
@@ -128,90 +99,47 @@ export class DiscussionsService {
     return message;
   }
 
-  async getDiscussionMessages(
-    discussionId: string,
-    skip = 0,
-    take = 50,
-  ) {
-    const messages = await this.prisma.message.findMany({
+  async getDiscussionMessages(discussionId: string, skip = 0, take = 50) {
+    return this.prisma.message.findMany({
       where: { discussionId },
       skip,
       take,
       orderBy: { createdAt: 'asc' },
       include: {
-        author: {
-          select: {
-            id: true,
-            username: true,
-            avatarUrl: true,
-          },
-        },
+        author: { select: { id: true, username: true, avatarUrl: true } },
         codeBlock: true,
         reactions: true,
       },
     });
-
-    return messages;
   }
 
   async deleteMessage(messageId: string, userId: string) {
-    const message = await this.prisma.message.findUnique({
-      where: { id: messageId },
-    });
+    const message = await this.prisma.message.findUnique({ where: { id: messageId } });
+    if (!message) throw new NotFoundException('Message not found');
+    if (message.authorId !== userId) throw new NotFoundException('Unauthorized');
 
-    if (!message) {
-      throw new NotFoundException('Message not found');
-    }
-
-    // Only author or moderator can delete
-    if (message.authorId !== userId) {
-      throw new NotFoundException('Unauthorized');
-    }
-
-    await this.prisma.message.delete({
-      where: { id: messageId },
-    });
-
-    // Update message count
+    await this.prisma.message.delete({ where: { id: messageId } });
     await this.prisma.discussion.update({
       where: { id: message.discussionId },
       data: { messageCount: { decrement: 1 } },
     });
-
     return { success: true };
   }
 
   async addReaction(messageId: string, emoji: string, userId: string) {
-    const message = await this.prisma.message.findUnique({
-      where: { id: messageId },
+    const message = await this.prisma.message.findUnique({ where: { id: messageId } });
+    if (!message) throw new NotFoundException('Message not found');
+
+    const existing = await this.prisma.reaction.findUnique({
+      where: { messageId_emoji: { messageId, emoji } },
     });
 
-    if (!message) {
-      throw new NotFoundException('Message not found');
-    }
-
-    const existingReaction = await this.prisma.reaction.findUnique({
-      where: {
-        messageId_emoji: {
-          messageId,
-          emoji,
-        },
-      },
-    });
-
-    if (existingReaction) {
+    if (existing) {
       return this.prisma.reaction.update({
-        where: { id: existingReaction.id },
+        where: { id: existing.id },
         data: { count: { increment: 1 } },
       });
     }
-
-    return this.prisma.reaction.create({
-      data: {
-        messageId,
-        emoji,
-        count: 1,
-      },
-    });
+    return this.prisma.reaction.create({ data: { messageId, emoji, count: 1 } });
   }
 }
