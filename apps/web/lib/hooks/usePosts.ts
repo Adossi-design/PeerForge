@@ -1,6 +1,25 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import { useAuth } from '@clerk/nextjs';
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001';
+
+async function fetchWithToken(path: string, token: string | null, options?: RequestInit) {
+  const { headers: extraHeaders, ...rest } = options ?? {};
+  const res = await fetch(`${API_URL}${path}`, {
+    credentials: 'include',
+    ...rest,
+    headers: {
+      'Content-Type': 'application/json',
+      ...(token ? { Authorization: `Bearer ${token}` } : {}),
+      ...(extraHeaders ?? {}),
+    },
+  });
+  if (!res.ok) {
+    const text = await res.text();
+    throw new Error(text || `${res.status}: ${res.statusText}`);
+  }
+  return res.json();
+}
 
 export interface Post {
   id: string;
@@ -9,20 +28,17 @@ export interface Post {
   type: string;
   status: string;
   visibility: string;
-  tags: string[] | null;
+  tags: string[];
+  attachments?: { name: string; url: string; size: number; type: string }[];
   teamSize?: number;
   deadline?: string;
   budget?: string;
   repositoryUrl?: string;
-  author: {
-    id: string;
-    username: string;
-    avatarUrl?: string;
-  };
-  _count: {
-    comments: number;
-    likes: number;
-  };
+  createdAt: string;
+  author: { id: string; username: string; avatarUrl?: string };
+  _count: { comments: number; likes: number };
+  isLiked?: boolean;
+  isSaved?: boolean;
 }
 
 export interface CreatePostInput {
@@ -37,85 +53,98 @@ export interface CreatePostInput {
   deadline?: string;
   budget?: string;
   repositoryUrl?: string;
+  attachments?: any[];
 }
 
 export function usePosts(skip = 0, take = 20) {
-  return useQuery({
+  const { getToken } = useAuth();
+  return useQuery<Post[]>({
     queryKey: ['posts', skip, take],
     queryFn: async () => {
-      const response = await fetch(
-        `${API_URL}/posts?skip=${skip}&take=${take}`,
-        {
-          headers: {
-            'Content-Type': 'application/json',
-          },
-          credentials: 'include',
-        }
-      );
-
-      if (!response.ok) {
-        throw new Error(`Failed to fetch posts: ${response.statusText}`);
-      }
-
-      const data = await response.json();
+      const token = await getToken();
+      const data = await fetchWithToken(`/posts?skip=${skip}&take=${take}`, token);
       return data.posts as Post[];
     },
   });
 }
 
-export function useCreatePost() {
-  const queryClient = useQueryClient();
+export function usePost(postId: string) {
+  const { getToken } = useAuth();
+  return useQuery<Post>({
+    queryKey: ['post', postId],
+    queryFn: async () => {
+      const token = await getToken();
+      const data = await fetchWithToken(`/posts/${postId}`, token);
+      return data.post ?? data;
+    },
+    enabled: !!postId,
+  });
+}
 
+export function useCreatePost() {
+  const { getToken } = useAuth();
+  const qc = useQueryClient();
   return useMutation({
     mutationFn: async (input: CreatePostInput & { userId?: string }) => {
       const { userId, ...body } = input as any;
-
-      const headers: Record<string, string> = {
-        'Content-Type': 'application/json',
-      };
-
-      if (userId) {
-        headers['x-user-id'] = userId;
-      } else {
-        headers['x-user-id'] = 'dev-user-' + Math.random().toString(36).substr(2, 9);
-      }
-
-      const response = await fetch(`${API_URL}/posts`, {
-        method: 'POST',
-        headers,
-        credentials: 'include',
-        body: JSON.stringify(body),
-      });
-
-      if (!response.ok) {
-        const error = await response.json();
-        throw new Error(error.message || 'Failed to create post');
-      }
-
-      return response.json();
+      const token = await getToken();
+      return fetchWithToken('/posts', token, { method: 'POST', body: JSON.stringify(body) });
     },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['posts'] });
+    onSuccess: () => qc.invalidateQueries({ queryKey: ['posts'] }),
+  });
+}
+
+export function useLikePost() {
+  const { getToken } = useAuth();
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async (postId: string) => {
+      const token = await getToken();
+      return fetchWithToken(`/posts/${postId}/like`, token, { method: 'POST' });
+    },
+    onSuccess: (data, postId) => {
+      // Update like count in all post caches
+      qc.setQueriesData({ queryKey: ['posts'] }, (old: Post[] | undefined) =>
+        old?.map((p) => p.id === postId
+          ? { ...p, _count: { ...p._count, likes: p._count.likes + (data.liked ? 1 : -1) }, isLiked: data.liked }
+          : p
+        )
+      );
+      qc.setQueryData(['post', postId], (old: Post | undefined) =>
+        old ? { ...old, _count: { ...old._count, likes: old._count.likes + (data.liked ? 1 : -1) }, isLiked: data.liked } : old
+      );
     },
   });
 }
 
-export function usePost(postId: string) {
-  return useQuery({
-    queryKey: ['post', postId],
+export function useSavePost() {
+  const { getToken } = useAuth();
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async (postId: string) => {
+      const token = await getToken();
+      return fetchWithToken(`/posts/${postId}/save`, token, { method: 'POST' });
+    },
+    onSuccess: (data, postId) => {
+      qc.setQueriesData({ queryKey: ['posts'] }, (old: Post[] | undefined) =>
+        old?.map((p) => p.id === postId ? { ...p, isSaved: data.saved } : p)
+      );
+      qc.setQueryData(['post', postId], (old: Post | undefined) =>
+        old ? { ...old, isSaved: data.saved } : old
+      );
+      qc.invalidateQueries({ queryKey: ['saved-posts'] });
+    },
+  });
+}
+
+export function useSavedPosts() {
+  const { getToken } = useAuth();
+  return useQuery<Post[]>({
+    queryKey: ['saved-posts'],
     queryFn: async () => {
-      const response = await fetch(`${API_URL}/posts/${postId}`, {
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        credentials: 'include',
-      });
-
-      if (!response.ok) {
-        throw new Error(`Failed to fetch post: ${response.statusText}`);
-      }
-
-      return response.json() as Promise<Post>;
+      const token = await getToken();
+      const data = await fetchWithToken('/posts/saved', token);
+      return data.posts ?? data;
     },
   });
 }
@@ -124,81 +153,34 @@ export interface Comment {
   id: string;
   content: string;
   createdAt: string;
-  author: {
-    id: string;
-    username: string;
-    avatarUrl?: string;
-  };
-  _count?: {
-    likes: number;
-  };
+  author: { id: string; username: string; avatarUrl?: string };
+  _count?: { likes: number };
 }
 
 export function usePostComments(postId: string) {
-  return useQuery({
+  const { getToken } = useAuth();
+  return useQuery<Comment[]>({
     queryKey: ['comments', postId],
     queryFn: async () => {
-      const response = await fetch(
-        `${API_URL}/comments/post/${postId}`,
-        {
-          headers: {
-            'Content-Type': 'application/json',
-          },
-          credentials: 'include',
-        }
-      );
-
-      if (!response.ok) {
-        throw new Error(`Failed to fetch comments: ${response.statusText}`);
-      }
-
-      return response.json() as Promise<Comment[]>;
+      const token = await getToken();
+      const data = await fetchWithToken(`/comments/post/${postId}`, token);
+      return data.comments ?? data;
     },
+    enabled: !!postId,
   });
 }
 
-export interface CreateCommentInput {
-  content: string;
-  postId: string;
-}
-
 export function useCreateComment() {
-  const queryClient = useQueryClient();
-
+  const { getToken } = useAuth();
+  const qc = useQueryClient();
   return useMutation({
-    mutationFn: async (
-      input: CreateCommentInput & { userId?: string }
-    ) => {
-      const { userId, postId, content } = input as any;
-
-      const headers: Record<string, string> = {
-        'Content-Type': 'application/json',
-      };
-
-      if (userId) {
-        headers['x-user-id'] = userId;
-      } else {
-        headers['x-user-id'] = 'dev-user-' + Math.random().toString(36).substr(2, 9);
-      }
-
-      const response = await fetch(`${API_URL}/comments`, {
+    mutationFn: async (input: { content: string; postId: string; userId?: string }) => {
+      const token = await getToken();
+      return fetchWithToken('/comments', token, {
         method: 'POST',
-        headers,
-        credentials: 'include',
-        body: JSON.stringify({ content, postId }),
-      });
-
-      if (!response.ok) {
-        const error = await response.json();
-        throw new Error(error.message || 'Failed to create comment');
-      }
-
-      return response.json();
-    },
-    onSuccess: (_, variables) => {
-      queryClient.invalidateQueries({
-        queryKey: ['comments', variables.postId],
+        body: JSON.stringify({ content: input.content, postId: input.postId }),
       });
     },
+    onSuccess: (_, vars) => qc.invalidateQueries({ queryKey: ['comments', vars.postId] }),
   });
 }
