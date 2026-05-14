@@ -1,0 +1,112 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  :root {
+    --background: 10 14% 6%;
+    --foreground: 0 0% 95%;
+    
+    --card: 17 11% 12%;
+    --card-foreground: 0 0% 95%;
+    
+    --primary: 260 80% 50%;
+    --primary-foreground: 0 0% 100%;
+    
+    --secondary: 280 60% 40%;
+    --secondary-foreground: 0 0% 100%;
+    
+    --muted: 17 11% 35%;
+    --muted-foreground: 0 0% 70%;
+    
+    --accent: 180 70% 45%;
+    --accent-foreground: 0 0% 100%;
+    
+    --destructive: 0 84% 60%;
+    --destructive-foreground: 0 0% 100%;
+    
+    --border: 17 11% 20%;
+    --input: 17 11% 16%;
+    --ring: 260 80% 50%;
+    --radius: 0.5rem;
+    
+    --font-sans: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+  }
+
+  .dark {
+    --background: 10 14% 6%;
+    --foreground: 0 0% 95%;
+    --card: 17 11% 12%;
+    --card-foreground: 0 0% 95%;
+    --primary: 260 80% 50%;
+    --primary-foreground: 0 0% 100%;
+    --secondary: 280 60% 40%;
+    --secondary-foreground: 0 0% 100%;
+    --muted: 17 11% 35%;
+    --muted-foreground: 0 0% 70%;
+    --accent: 180 70% 45%;
+    --accent-foreground: 0 0% 100%;
+    --destructive: 0 84% 60%;
+    --destructive-foreground: 0 0% 100%;
+    --border: 17 11% 20%;
+    --input: 17 11% 16%;
+    --ring: 260 80% 50%;
+  }
+
+  * {
+    @apply border-border;
+  }
+
+  body {
+    @apply bg-background text-foreground;
+  }
+}
+
+/* Smooth scrolling */
+html {
+  scroll-behavior: smooth;
+}
+
+/* Typography */
+@layer components {
+  .heading-1 {
+    @apply text-4xl font-bold tracking-tighter;
+  }
+
+  .heading-2 {
+    @apply text-3xl font-bold tracking-tight;
+  }
+
+  .heading-3 {
+    @apply text-2xl font-semibold;
+  }
+
+  .heading-4 {
+    @apply text-xl font-semibold;
+  }
+
+  .body-large {
+    @apply text-lg leading-7;
+  }
+
+  .body-medium {
+    @apply text-base leading-6;
+  }
+
+  .body-small {
+    @apply text-sm leading-5;
+  }
+
+  .label {
+    @apply text-sm font-medium;
+  }
+
+  /* Cards and containers */
+  .card-gradient {
+    @apply bg-gradient-to-br from-card to-card/50;
+  }
+
+  .smooth-transition {
+    @apply transition-all duration-200 ease-out;
+  }
+}
