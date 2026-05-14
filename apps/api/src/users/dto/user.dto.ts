@@ -1,10 +1,15 @@
-import { IsOptional, IsEmail, MinLength, MaxLength } from 'class-validator';
+import { IsOptional, MinLength, MaxLength, IsArray } from 'class-validator';
 
 export class UpdateUserProfileDto {
   @IsOptional()
+  @MinLength(2)
+  @MaxLength(100)
+  fullName?: string;
+
+  @IsOptional()
   @MinLength(3)
   @MaxLength(50)
-  fullName?: string;
+  username?: string;
 
   @IsOptional()
   @MaxLength(500)
@@ -24,6 +29,17 @@ export class UpdateUserProfileDto {
 
   @IsOptional()
   portfolioUrl?: string;
+
+  @IsOptional()
+  linkedinUrl?: string;
+
+  @IsOptional()
+  @IsArray()
+  skills?: string[];
+
+  @IsOptional()
+  @IsArray()
+  interests?: string[];
 }
 
 export class AddSkillDto {
@@ -42,6 +58,9 @@ export class UserResponseDto {
   country?: string;
   githubUrl?: string;
   portfolioUrl?: string;
+  linkedinUrl?: string;
+  skills!: string[];
+  interests!: string[];
   reputation!: number;
   isVerified!: boolean;
   createdAt!: Date;
