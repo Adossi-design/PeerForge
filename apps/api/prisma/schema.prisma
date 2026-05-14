@@ -1,6 +1,4 @@
 // This is your Prisma schema file for SQLite (development)
-// learn more about it in the docs: https://pris.ly/d/prisma-schema
-
 datasource db {
   provider = "sqlite"
   url      = env("DATABASE_URL")
@@ -9,8 +7,6 @@ datasource db {
 generator client {
   provider = "prisma-client-js"
 }
-
-// ==================== CORE MODELS ====================
 
 model User {
   id            String    @id @default(cuid())
@@ -24,89 +20,83 @@ model User {
   country       String?
   githubUrl     String?
   portfolioUrl  String?
-  
-  // Relations
-  skills        UserSkill[]
-  posts         Post[]
-  comments      Comment[]
-  likes         Like[]
-  messages      Message[]
-  notifications Notification[]
+  linkedinUrl   String?
+  interests     String?
+  skillsJson    String?
+
+  skills         UserSkill[]
+  posts          Post[]
+  comments       Comment[]
+  likes          Like[]
+  messages       Message[]
+  notifications  Notification[]
   collaborations Collaboration[]
-  
-  // Metadata
-  reputation    Int       @default(0)
-  isVerified    Boolean   @default(false)
-  createdAt     DateTime  @default(now())
-  updatedAt     DateTime  @updatedAt
-  
+  savedPosts     SavedPost[]
+
+  reputation  Int     @default(0)
+  isVerified  Boolean @default(false)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
   @@index([clerkId])
   @@index([username])
   @@index([email])
 }
 
 model Skill {
-  id          String    @id @default(cuid())
-  name        String    @unique
-  category    String    // LANGUAGE, FRAMEWORK, TOOL, DOMAIN
+  id          String  @id @default(cuid())
+  name        String  @unique
+  category    String
   description String?
-  
-  users       UserSkill[]
-  postSkills  PostSkill[]
-  
+
+  users      UserSkill[]
+  postSkills PostSkill[]
+
   @@index([category])
   @@index([name])
 }
 
 model UserSkill {
-  id                String    @id @default(cuid())
-  user              User      @relation(fields: [userId], references: [id], onDelete: Cascade)
-  userId            String
-  skill             Skill     @relation(fields: [skillId], references: [id], onDelete: Cascade)
-  skillId           String
-  proficiencyLevel  String    @default("BEGINNER")
-  endorsements      Int       @default(0)
-  
-  createdAt         DateTime  @default(now())
-  
+  id               String @id @default(cuid())
+  user             User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+  userId           String
+  skill            Skill  @relation(fields: [skillId], references: [id], onDelete: Cascade)
+  skillId          String
+  proficiencyLevel String @default("BEGINNER")
+  endorsements     Int    @default(0)
+  createdAt        DateTime @default(now())
+
   @@unique([userId, skillId])
   @@index([userId])
   @@index([skillId])
 }
 
-// ==================== POST MODELS ====================
-
 model Post {
-  id              String    @id @default(cuid())
-  title           String
-  description     String
-  type            String
-  status          String    @default("IDEATION")
-  visibility      String    @default("PUBLIC")
-  
-  author          User      @relation(fields: [authorId], references: [id], onDelete: Cascade)
-  authorId        String
-  
-  requiredSkills  PostSkill[]
-  tags            String?
-  
-  teamSize        Int?
-  deadline        DateTime?
-  budget          Int?
-  repositoryUrl   String?
-  
-  // Relations
-  comments        Comment[]
-  likes           Like[]
-  discussion      Discussion?
-  collaborations  Collaboration[]
-  
-  isPinned        Boolean   @default(false)
-  viewCount       Int       @default(0)
-  
-  createdAt       DateTime  @default(now())
-  updatedAt       DateTime  @updatedAt
-  
+  id            String   @id @default(cuid())
+  title         String
+  description   String
+  type          String
+  status        String   @default("IDEATION")
+  visibility    String   @default("PUBLIC")
+  authorId      String
+  author        User     @relation(fields: [authorId], references: [id], onDelete: Cascade)
+  requiredSkills PostSkill[]
+  tags          String?
+  attachments   String?
+  teamSize      Int?
+  deadline      DateTime?
+  budget        Int?
+  repositoryUrl String?
+  comments      Comment[]
+  likes         Like[]
+  savedBy       SavedPost[]
+  discussion    Discussion?
+  collaborations Collaboration[]
+  isPinned      Boolean  @default(false)
+  viewCount     Int      @default(0)
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
   @@index([authorId])
   @@index([type])
   @@index([status])
@@ -114,76 +104,77 @@ model Post {
   @@index([visibility])
 }
 
+model SavedPost {
+  id        String   @id @default(cuid())
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  userId    String
+  post      Post     @relation(fields: [postId], references: [id], onDelete: Cascade)
+  postId    String
+  createdAt DateTime @default(now())
+
+  @@unique([userId, postId])
+  @@index([userId])
+}
+
 model PostSkill {
-  id      String  @id @default(cuid())
-  post    Post    @relation(fields: [postId], references: [id], onDelete: Cascade)
+  id      String @id @default(cuid())
+  post    Post   @relation(fields: [postId], references: [id], onDelete: Cascade)
   postId  String
-  skill   Skill   @relation(fields: [skillId], references: [id])
+  skill   Skill  @relation(fields: [skillId], references: [id])
   skillId String
-  
+
   @@unique([postId, skillId])
   @@index([postId])
   @@index([skillId])
 }
 
-// ==================== DISCUSSION MODELS ====================
-
 model Discussion {
-  id              String    @id @default(cuid())
-  post            Post      @relation(fields: [postId], references: [id], onDelete: Cascade)
-  postId          String    @unique
-  
-  name            String
-  description     String?
-  
-  members         DiscussionMember[]
-  messages        Message[]
-  pinnedMessages  String?
-  
-  messageCount    Int       @default(0)
-  memberCount     Int       @default(0)
-  
-  createdAt       DateTime  @default(now())
-  updatedAt       DateTime  @updatedAt
-  
+  id           String   @id @default(cuid())
+  post         Post     @relation(fields: [postId], references: [id], onDelete: Cascade)
+  postId       String   @unique
+  name         String
+  description  String?
+  type         String   @default("PROJECT")
+  members      DiscussionMember[]
+  messages     Message[]
+  pinnedMessages String?
+  messageCount Int      @default(0)
+  memberCount  Int      @default(0)
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
   @@index([postId])
   @@index([createdAt])
 }
 
 model DiscussionMember {
-  id            String    @id @default(cuid())
-  discussion    Discussion @relation(fields: [discussionId], references: [id], onDelete: Cascade)
-  discussionId  String
-  userId        String
-  role          String    @default("MEMBER")
-  lastReadAt    DateTime  @default(now())
-  joinedAt      DateTime  @default(now())
-  
+  id           String     @id @default(cuid())
+  discussion   Discussion @relation(fields: [discussionId], references: [id], onDelete: Cascade)
+  discussionId String
+  userId       String
+  role         String     @default("MEMBER")
+  lastReadAt   DateTime   @default(now())
+  joinedAt     DateTime   @default(now())
+
   @@unique([discussionId, userId])
   @@index([discussionId])
   @@index([userId])
 }
 
-// ==================== MESSAGE MODELS ====================
-
 model Message {
-  id            String    @id @default(cuid())
-  discussion    Discussion @relation(fields: [discussionId], references: [id], onDelete: Cascade)
-  discussionId  String
-  
-  author        User      @relation(fields: [authorId], references: [id], onDelete: Cascade)
-  authorId      String
-  
-  content       String
-  type          String    @default("TEXT")
-  
-  codeBlock     CodeBlock?
-  reactions     Reaction[]
-  
-  isEdited      Boolean   @default(false)
-  createdAt     DateTime  @default(now())
-  updatedAt     DateTime  @updatedAt
-  
+  id           String     @id @default(cuid())
+  discussion   Discussion @relation(fields: [discussionId], references: [id], onDelete: Cascade)
+  discussionId String
+  author       User       @relation(fields: [authorId], references: [id], onDelete: Cascade)
+  authorId     String
+  content      String
+  type         String     @default("TEXT")
+  codeBlock    CodeBlock?
+  reactions    Reaction[]
+  isEdited     Boolean    @default(false)
+  createdAt    DateTime   @default(now())
+  updatedAt    DateTime   @updatedAt
+
   @@index([discussionId])
   @@index([authorId])
   @@index([createdAt])
@@ -204,49 +195,38 @@ model Reaction {
   messageId String
   emoji     String
   count     Int     @default(1)
-  
+
   @@unique([messageId, emoji])
   @@index([messageId])
 }
 
-// ==================== COMMENT MODELS ====================
-
 model Comment {
-  id        String  @id @default(cuid())
-  post      Post    @relation(fields: [postId], references: [id], onDelete: Cascade)
+  id        String   @id @default(cuid())
+  post      Post     @relation(fields: [postId], references: [id], onDelete: Cascade)
   postId    String
-  
-  author    User    @relation(fields: [authorId], references: [id], onDelete: Cascade)
+  author    User     @relation(fields: [authorId], references: [id], onDelete: Cascade)
   authorId  String
-  
   content   String
-  
   likes     Like[]
-  likeCount Int     @default(0)
-  
+  likeCount Int      @default(0)
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
-  
+
   @@index([postId])
   @@index([authorId])
   @@index([createdAt])
 }
 
-// ==================== LIKE MODELS ====================
-
 model Like {
-  id        String  @id @default(cuid())
-  user      User    @relation(fields: [userId], references: [id], onDelete: Cascade)
+  id        String   @id @default(cuid())
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
   userId    String
-  
-  post      Post?   @relation(fields: [postId], references: [id], onDelete: Cascade)
+  post      Post?    @relation(fields: [postId], references: [id], onDelete: Cascade)
   postId    String?
-  
   comment   Comment? @relation(fields: [commentId], references: [id], onDelete: Cascade)
   commentId String?
-  
   createdAt DateTime @default(now())
-  
+
   @@unique([userId, postId])
   @@unique([userId, commentId])
   @@index([userId])
@@ -254,43 +234,34 @@ model Like {
   @@index([commentId])
 }
 
-// ==================== COLLABORATION MODELS ====================
-
 model Collaboration {
-  id        String  @id @default(cuid())
-  post      Post    @relation(fields: [postId], references: [id], onDelete: Cascade)
+  id        String   @id @default(cuid())
+  post      Post     @relation(fields: [postId], references: [id], onDelete: Cascade)
   postId    String
-  
-  user      User    @relation(fields: [userId], references: [id], onDelete: Cascade)
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
   userId    String
-  
-  status    String  @default("PENDING")
+  status    String   @default("PENDING")
   message   String?
-  
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
-  
+
   @@unique([postId, userId])
   @@index([postId])
   @@index([userId])
   @@index([status])
 }
 
-// ==================== NOTIFICATION MODELS ====================
-
 model Notification {
-  id        String  @id @default(cuid())
-  user      User    @relation(fields: [userId], references: [id], onDelete: Cascade)
+  id        String   @id @default(cuid())
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
   userId    String
-  
   type      String
   title     String
   message   String
   link      String?
-  
-  read      Boolean @default(false)
+  read      Boolean  @default(false)
   createdAt DateTime @default(now())
-  
+
   @@index([userId])
   @@index([createdAt])
   @@index([read])
