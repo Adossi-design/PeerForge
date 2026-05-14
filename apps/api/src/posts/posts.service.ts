@@ -1,41 +1,41 @@
 import { Injectable, NotFoundException, ForbiddenException } from '@nestjs/common';
 import { PrismaService } from '@/database/prisma.service';
 import { CreatePostDto, UpdatePostDto } from './dto/post.dto';
-import { Post } from '@prisma/client';
 import { PostVisibility } from '@/types';
+
+const POST_INCLUDE = {
+  author: { select: { id: true, username: true, avatarUrl: true } },
+  _count: { select: { comments: true, likes: true } },
+};
+
+function parseTags(post: any) {
+  return {
+    ...post,
+    tags: post.tags
+      ? typeof post.tags === 'string'
+        ? (() => { try { return JSON.parse(post.tags); } catch { return []; } })()
+        : post.tags
+      : [],
+    attachments: post.attachments
+      ? (() => { try { return JSON.parse(post.attachments); } catch { return []; } })()
+      : [],
+  };
+}
 
 @Injectable()
 export class PostsService {
   constructor(private prisma: PrismaService) {}
 
-  async createPost(authorId: string, data: CreatePostDto): Promise<Post> {
-    // Resolve author: support both prisma `id` and Clerk `clerkId`.
-    let authorPrismaId = authorId;
-
-    // Try find by Prisma id first
+  async createPost(authorId: string, data: CreatePostDto) {
+    // Resolve to prisma user id
     let user = await this.prisma.user.findUnique({ where: { id: authorId } });
-
-    // If not found, try find by clerkId
+    if (!user) user = await this.prisma.user.findUnique({ where: { clerkId: authorId } });
     if (!user) {
-      user = await this.prisma.user.findUnique({ where: { clerkId: authorId } });
-    }
-
-    // If still not found, create a new user record (dev fallback)
-    if (!user) {
-      const created = await this.prisma.user.create({
-        data: {
-          clerkId: authorId,
-          email: `${authorId}@dev.local`,
-          username: `user_${authorId}`,
-        },
+      user = await this.prisma.user.create({
+        data: { clerkId: authorId, email: `${authorId}@dev.local`, username: `user_${authorId.slice(-8)}` },
       });
-      authorPrismaId = created.id;
-    } else {
-      authorPrismaId = user.id;
     }
 
-    // Create post
-    // Use resolved Prisma author id
     const post = await this.prisma.post.create({
       data: {
         title: data.title,
@@ -45,42 +45,18 @@ export class PostsService {
         visibility: data.visibility || 'PUBLIC',
         tags: data.tags ? JSON.stringify(data.tags) : null,
         teamSize: data.teamSize,
-        deadline: data.deadline,
+        deadline: data.deadline ? new Date(data.deadline) : null,
         budget: data.budget,
         repositoryUrl: data.repositoryUrl,
-        authorId: authorPrismaId,
+        attachments: (data as any).attachments ? JSON.stringify((data as any).attachments) : null,
+        authorId: user.id,
       },
-      include: {
-        author: {
-          select: {
-            id: true,
-            username: true,
-            avatarUrl: true,
-          },
-        },
-        requiredSkills: {
-          include: {
-            skill: true,
-          },
-        },
-        _count: {
-          select: {
-            comments: true,
-            likes: true,
-          },
-        },
-      },
+      include: POST_INCLUDE,
     });
 
-    // Add required skills
-    if (data.requiredSkillIds && data.requiredSkillIds.length > 0) {
+    if (data.requiredSkillIds?.length) {
       for (const skillId of data.requiredSkillIds) {
-        await this.prisma.postSkill.create({
-          data: {
-            postId: post.id,
-            skillId,
-          },
-        });
+        await this.prisma.postSkill.create({ data: { postId: post.id, skillId } }).catch(() => {});
       }
     }
 
@@ -88,106 +64,46 @@ export class PostsService {
     await this.prisma.discussion.create({
       data: {
         postId: post.id,
-        name: `${data.type} - ${data.title}`,
+        name: `${data.title}`,
         description: data.description,
+        type: 'PROJECT',
       },
     });
 
-    return post;
+    return parseTags(post);
   }
 
   async getPostById(id: string) {
     const post = await this.prisma.post.findUnique({
       where: { id },
       include: {
-        author: {
-          select: {
-            id: true,
-            username: true,
-            avatarUrl: true,
-            reputation: true,
-          },
-        },
-        requiredSkills: {
-          include: {
-            skill: true,
-          },
-        },
-        _count: {
-          select: {
-            comments: true,
-            likes: true,
-          },
-        },
-        discussion: {
-          select: {
-            id: true,
-            memberCount: true,
-          },
-        },
+        ...POST_INCLUDE,
+        requiredSkills: { include: { skill: true } },
+        discussion: { select: { id: true, memberCount: true } },
       },
     });
-
-    if (!post) {
-      throw new NotFoundException('Post not found');
-    }
-
-    // Increment view count
-    await this.prisma.post.update({
-      where: { id },
-      data: { viewCount: { increment: 1 } },
-    });
-
-    return post;
+    if (!post) throw new NotFoundException('Post not found');
+    await this.prisma.post.update({ where: { id }, data: { viewCount: { increment: 1 } } });
+    return parseTags(post);
   }
 
   async getFeed(skip = 0, take = 20) {
     const posts = await this.prisma.post.findMany({
-      where: {
-        visibility: PostVisibility.PUBLIC,
-      },
+      where: { visibility: PostVisibility.PUBLIC },
       skip,
       take,
       orderBy: { createdAt: 'desc' },
-      include: {
-        author: {
-          select: {
-            id: true,
-            username: true,
-            avatarUrl: true,
-          },
-        },
-        requiredSkills: {
-          include: {
-            skill: true,
-          },
-        },
-        _count: {
-          select: {
-            comments: true,
-            likes: true,
-          },
-        },
-      },
+      include: POST_INCLUDE,
     });
-
-    return posts;
+    return posts.map(parseTags);
   }
 
   async updatePost(postId: string, authorId: string, data: UpdatePostDto) {
-    const post = await this.prisma.post.findUnique({
-      where: { id: postId },
-    });
+    const post = await this.prisma.post.findUnique({ where: { id: postId } });
+    if (!post) throw new NotFoundException('Post not found');
+    if (post.authorId !== authorId) throw new ForbiddenException('You can only edit your own posts');
 
-    if (!post) {
-      throw new NotFoundException('Post not found');
-    }
-
-    if (post.authorId !== authorId) {
-      throw new ForbiddenException('You can only edit your own posts');
-    }
-
-    return this.prisma.post.update({
+    const updated = await this.prisma.post.update({
       where: { id: postId },
       data: {
         title: data.title,
@@ -196,40 +112,16 @@ export class PostsService {
         visibility: data.visibility,
         tags: data.tags ? JSON.stringify(data.tags) : undefined,
       },
-      include: {
-        author: {
-          select: {
-            id: true,
-            username: true,
-            avatarUrl: true,
-          },
-        },
-        _count: {
-          select: {
-            comments: true,
-            likes: true,
-          },
-        },
-      },
+      include: POST_INCLUDE,
     });
+    return parseTags(updated);
   }
 
   async deletePost(postId: string, authorId: string) {
-    const post = await this.prisma.post.findUnique({
-      where: { id: postId },
-    });
-
-    if (!post) {
-      throw new NotFoundException('Post not found');
-    }
-
-    if (post.authorId !== authorId) {
-      throw new ForbiddenException('You can only delete your own posts');
-    }
-
-    return this.prisma.post.delete({
-      where: { id: postId },
-    });
+    const post = await this.prisma.post.findUnique({ where: { id: postId } });
+    if (!post) throw new NotFoundException('Post not found');
+    if (post.authorId !== authorId) throw new ForbiddenException('You can only delete your own posts');
+    return this.prisma.post.delete({ where: { id: postId } });
   }
 
   async searchPosts(query: string, tags: string[] = [], skip = 0, take = 20) {
@@ -237,91 +129,68 @@ export class PostsService {
       where: {
         AND: [
           { visibility: 'PUBLIC' },
-          {
-            OR: [
-              { title: { contains: query } },
-              { description: { contains: query } },
-            ],
-          },
+          { OR: [{ title: { contains: query } }, { description: { contains: query } }] },
         ],
       },
       skip,
       take,
       orderBy: { createdAt: 'desc' },
-      include: {
-        author: {
-          select: {
-            id: true,
-            username: true,
-            avatarUrl: true,
-          },
-        },
-        _count: {
-          select: {
-            comments: true,
-            likes: true,
-          },
-        },
-      },
+      include: POST_INCLUDE,
     });
-
-    return posts;
+    return posts.map(parseTags);
   }
 
   async getUserPosts(userId: string, skip = 0, take = 20) {
-    return this.prisma.post.findMany({
+    const posts = await this.prisma.post.findMany({
       where: { authorId: userId },
       skip,
       take,
       orderBy: { createdAt: 'desc' },
-      include: {
-        author: {
-          select: {
-            id: true,
-            username: true,
-            avatarUrl: true,
-          },
-        },
-        _count: {
-          select: {
-            comments: true,
-            likes: true,
-          },
-        },
-      },
+      include: POST_INCLUDE,
     });
+    return posts.map(parseTags);
   }
 
   async likePost(postId: string, userId: string) {
-    const existingLike = await this.prisma.like.findUnique({
-      where: {
-        userId_postId: {
-          userId,
-          postId,
-        },
-      },
+    const existing = await this.prisma.like.findUnique({
+      where: { userId_postId: { userId, postId } },
     });
-
-    if (existingLike) {
-      await this.prisma.like.delete({
-        where: { id: existingLike.id },
-      });
+    if (existing) {
+      await this.prisma.like.delete({ where: { id: existing.id } });
       return { liked: false };
     }
-
-    await this.prisma.like.create({
-      data: {
-        userId,
-        postId,
-      },
-    });
-
+    await this.prisma.like.create({ data: { userId, postId } });
     return { liked: true };
   }
 
   async savePost(postId: string, userId: string) {
-    // SavedPost functionality not available in SQLite schema
-    // This will be implemented as a separate feature in production
-    return { saved: false };
+    // Check if already saved
+    const existing = await this.prisma.savedPost.findUnique({
+      where: { userId_postId: { userId, postId } },
+    }).catch(() => null);
+
+    if (existing) {
+      await this.prisma.savedPost.delete({ where: { id: existing.id } }).catch(() => {});
+      return { saved: false };
+    }
+
+    await this.prisma.savedPost.create({ data: { userId, postId } }).catch(() => {});
+    return { saved: true };
+  }
+
+  async getSavedPosts(userId: string) {
+    const saved = await this.prisma.savedPost.findMany({
+      where: { userId },
+      include: {
+        post: {
+          include: {
+            author: { select: { id: true, username: true, avatarUrl: true } },
+            _count: { select: { comments: true, likes: true } },
+          },
+        },
+      },
+      orderBy: { createdAt: 'desc' },
+    }).catch(() => []);
+    return saved.map((s: any) => parseTags(s.post)).filter(Boolean);
   }
 }
