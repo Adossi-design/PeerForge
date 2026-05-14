@@ -1,78 +1,111 @@
 import { Injectable, BadRequestException, NotFoundException } from '@nestjs/common';
 import { PrismaService } from '@/database/prisma.service';
-import { AuthDto, OnboardingDto, SignUpDto } from './dto/auth.dto';
-import { User } from '@prisma/client';
+import { AuthDto, OnboardingDto } from './dto/auth.dto';
+import { createClerkClient } from '@clerk/backend';
+
+const clerk = createClerkClient({ secretKey: process.env.CLERK_SECRET_KEY });
 
 @Injectable()
 export class AuthService {
   constructor(private prisma: PrismaService) {}
 
-  async upsertUserFromClerk(data: AuthDto): Promise<User> {
-    // Find or create user from Clerk webhook
-    let user = await this.prisma.user.findUnique({
-      where: { clerkId: data.clerkId },
-    });
-
+  async upsertUserFromClerk(data: AuthDto) {
+    let user = await this.prisma.user.findUnique({ where: { clerkId: data.clerkId } });
     if (!user) {
-      // Check if username already exists
-      const existingUsername = await this.prisma.user.findUnique({
-        where: { username: data.username },
-      });
-
-      if (existingUsername) {
-        throw new BadRequestException('Username already taken');
-      }
-
+      const existingUsername = await this.prisma.user.findUnique({ where: { username: data.username } });
+      if (existingUsername) throw new BadRequestException('Username already taken');
       user = await this.prisma.user.create({
-        data: {
-          clerkId: data.clerkId,
-          email: data.email,
-          username: data.username,
-          fullName: data.fullName,
-        },
+        data: { clerkId: data.clerkId, email: data.email, username: data.username, fullName: data.fullName },
       });
     }
-
     return user;
   }
 
-  async completeOnboarding(userId: string, data: OnboardingDto): Promise<User> {
-    const user = await this.prisma.user.findUnique({
-      where: { id: userId },
-    });
+  async completeOnboarding(userId: string, data: OnboardingDto) {
+    const user = await this.prisma.user.findUnique({ where: { id: userId } });
+    if (!user) throw new NotFoundException('User not found');
 
-    if (!user) {
-      throw new NotFoundException('User not found');
-    }
-
-    // Add skills to user
-    if (data.skills && data.skills.length > 0) {
+    if (data.skills?.length) {
       for (const skillId of data.skills) {
         await this.prisma.userSkill.create({
-          data: {
-            userId,
-            skillId,
-            proficiencyLevel: 'BEGINNER',
-          },
-        });
+          data: { userId, skillId, proficiencyLevel: 'BEGINNER' },
+        }).catch(() => {});
       }
     }
 
-    // Update user profile
     return this.prisma.user.update({
       where: { id: userId },
-      data: {
-        bio: data.bio,
-        avatarUrl: data.avatarUrl,
-        githubUrl: data.githubUrl,
-        portfolioUrl: data.portfolioUrl,
-      },
+      data: { bio: data.bio, avatarUrl: data.avatarUrl, githubUrl: data.githubUrl, portfolioUrl: data.portfolioUrl },
     });
   }
 
-  async getCurrentUser(clerkId: string): Promise<User | null> {
-    return this.prisma.user.findUnique({
+  async getCurrentUser(clerkId: string) {
+    let user = await this.prisma.user.findUnique({
       where: { clerkId },
+      include: {
+        skills: { include: { skill: true } },
+        _count: { select: { posts: true } },
+      },
     });
+
+    // Auto-create from Clerk if not in DB yet
+    if (!user) {
+      try {
+        const clerkUser = await clerk.users.getUser(clerkId);
+        const email = clerkUser.emailAddresses[0]?.emailAddress ?? `${clerkId}@unknown.local`;
+        const username = clerkUser.username ?? clerkUser.firstName?.toLowerCase() ?? `user_${clerkId.slice(-8)}`;
+
+        const existingByEmail = await this.prisma.user.findUnique({ where: { email } });
+        const existingByUsername = await this.prisma.user.findUnique({ where: { username } });
+
+        user = await this.prisma.user.create({
+          data: {
+            clerkId,
+            email: existingByEmail ? `${clerkId}@clerk.local` : email,
+            username: existingByUsername ? `${username}_${clerkId.slice(-4)}` : username,
+            fullName: [clerkUser.firstName, clerkUser.lastName].filter(Boolean).join(' ') || null,
+            avatarUrl: clerkUser.imageUrl || null,
+          },
+          include: {
+            skills: { include: { skill: true } },
+            _count: { select: { posts: true } },
+          },
+        }) as any;
+      } catch {
+        return null;
+      }
+    }
+
+    if (!user) return null;
+
+    const skillNames = (user.skills ?? []).map((us: any) => us.skill?.name ?? '');
+    let skillsFromJson: string[] = [];
+    if ((user as any).skillsJson) {
+      try { skillsFromJson = JSON.parse((user as any).skillsJson); } catch {}
+    }
+    const finalSkills = skillsFromJson.length > 0 ? skillsFromJson : skillNames;
+    let interests: string[] = [];
+    try { interests = user.interests ? JSON.parse(user.interests as string) : []; } catch {}
+
+    return {
+      id: user.id,
+      clerkId: user.clerkId,
+      username: user.username,
+      fullName: user.fullName,
+      email: user.email,
+      bio: user.bio,
+      avatarUrl: user.avatarUrl,
+      university: user.university,
+      country: user.country,
+      githubUrl: user.githubUrl,
+      portfolioUrl: user.portfolioUrl,
+      linkedinUrl: (user as any).linkedinUrl,
+      skills: finalSkills,
+      interests,
+      reputation: user.reputation,
+      isVerified: user.isVerified,
+      createdAt: user.createdAt,
+      _count: (user as any)._count,
+    };
   }
 }
