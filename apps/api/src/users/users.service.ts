@@ -1,7 +1,6 @@
 import { Injectable, NotFoundException } from '@nestjs/common';
 import { PrismaService } from '@/database/prisma.service';
 import { UpdateUserProfileDto, AddSkillDto, UserResponseDto } from './dto/user.dto';
-import { User } from '@prisma/client';
 
 @Injectable()
 export class UsersService {
@@ -11,18 +10,11 @@ export class UsersService {
     const user = await this.prisma.user.findUnique({
       where: { id },
       include: {
-        skills: {
-          include: {
-            skill: true,
-          },
-        },
+        skills: { include: { skill: true } },
+        _count: { select: { posts: true } },
       },
     });
-
-    if (!user) {
-      throw new NotFoundException('User not found');
-    }
-
+    if (!user) throw new NotFoundException('User not found');
     return this.formatUser(user);
   }
 
@@ -30,101 +22,90 @@ export class UsersService {
     const user = await this.prisma.user.findUnique({
       where: { username },
       include: {
-        skills: {
-          include: {
-            skill: true,
-          },
-        },
+        skills: { include: { skill: true } },
+        _count: { select: { posts: true } },
         posts: {
-          select: {
-            id: true,
-            title: true,
-            type: true,
-            createdAt: true,
-          },
+          select: { id: true, title: true, type: true, createdAt: true },
           take: 10,
           orderBy: { createdAt: 'desc' },
         },
       },
     });
+    if (!user) throw new NotFoundException('User not found');
+    return this.formatUser(user);
+  }
 
-    if (!user) {
-      throw new NotFoundException('User not found');
-    }
-
+  async getUserByClerkId(clerkId: string) {
+    const user = await this.prisma.user.findUnique({
+      where: { clerkId },
+      include: {
+        skills: { include: { skill: true } },
+        _count: { select: { posts: true } },
+      },
+    });
+    if (!user) throw new NotFoundException('User not found');
     return this.formatUser(user);
   }
 
   async updateProfile(userId: string, data: UpdateUserProfileDto) {
+    const { skills, interests, ...rest } = data as any;
+
+    const updateData: any = { ...rest };
+    if (interests !== undefined) updateData.interests = JSON.stringify(interests);
+    if (skills !== undefined) updateData.skillsJson = JSON.stringify(skills);
+
     const user = await this.prisma.user.update({
       where: { id: userId },
-      data,
+      data: updateData,
       include: {
-        skills: {
-          include: {
-            skill: true,
-          },
-        },
+        skills: { include: { skill: true } },
+        _count: { select: { posts: true } },
       },
     });
-
     return this.formatUser(user);
   }
 
   async addSkill(userId: string, skillData: AddSkillDto) {
-    // Check if user already has this skill
-    const existingSkill = await this.prisma.userSkill.findUnique({
-      where: {
-        userId_skillId: {
-          userId,
-          skillId: skillData.skillId,
-        },
-      },
+    const existing = await this.prisma.userSkill.findUnique({
+      where: { userId_skillId: { userId, skillId: skillData.skillId } },
     });
-
-    if (existingSkill) {
-      // Update proficiency level
+    if (existing) {
       return this.prisma.userSkill.update({
-        where: { id: existingSkill.id },
+        where: { id: existing.id },
         data: { proficiencyLevel: skillData.proficiencyLevel },
         include: { skill: true },
       });
     }
-
-    // Create new user skill
     return this.prisma.userSkill.create({
-      data: {
-        userId,
-        skillId: skillData.skillId,
-        proficiencyLevel: skillData.proficiencyLevel,
-      },
+      data: { userId, skillId: skillData.skillId, proficiencyLevel: skillData.proficiencyLevel },
       include: { skill: true },
     });
   }
 
   async searchUsers(query: string, limit = 20) {
-    const users = await this.prisma.user.findMany({
+    return this.prisma.user.findMany({
       where: {
-        OR: [
-          { username: { contains: query } },
-          { fullName: { contains: query } },
-        ],
+        OR: [{ username: { contains: query } }, { fullName: { contains: query } }],
       },
       take: limit,
-      select: {
-        id: true,
-        username: true,
-        fullName: true,
-        avatarUrl: true,
-        bio: true,
-        reputation: true,
-      },
+      select: { id: true, username: true, fullName: true, avatarUrl: true, bio: true, reputation: true },
     });
-
-    return users;
   }
 
   private formatUser(user: any): UserResponseDto {
+    // Skills: prefer skillsJson (plain string array) over UserSkill relations
+    let skillNames: string[] = [];
+    if (user.skillsJson) {
+      try { skillNames = JSON.parse(user.skillsJson); } catch { skillNames = []; }
+    } else {
+      skillNames = (user.skills ?? []).map((us: any) => us.skill?.name ?? us.skillId);
+    }
+
+    let interests: string[] = [];
+    if (user.interests) {
+      try { interests = JSON.parse(user.interests); } catch { interests = []; }
+    }
+
     return {
       id: user.id,
       username: user.username,
@@ -136,9 +117,13 @@ export class UsersService {
       country: user.country,
       githubUrl: user.githubUrl,
       portfolioUrl: user.portfolioUrl,
+      linkedinUrl: user.linkedinUrl,
+      skills: skillNames,
+      interests,
       reputation: user.reputation,
       isVerified: user.isVerified,
       createdAt: user.createdAt,
-    };
+      _count: user._count,
+    } as any;
   }
 }
