@@ -32,6 +32,10 @@ model User {
   notifications  Notification[]
   collaborations Collaboration[]
   savedPosts     SavedPost[]
+  sentMessages     DirectMessage[] @relation("SentMessages")
+  receivedMessages DirectMessage[] @relation("ReceivedMessages")
+  following        Follow[]        @relation("Follower")
+  followers        Follow[]        @relation("Following")
 
   reputation  Int     @default(0)
   isVerified  Boolean @default(false)
@@ -93,6 +97,7 @@ model Post {
   discussion    Discussion?
   collaborations Collaboration[]
   isPinned      Boolean  @default(false)
+  shareCount    Int      @default(0)
   viewCount     Int      @default(0)
   createdAt     DateTime @default(now())
   updatedAt     DateTime @updatedAt
@@ -251,6 +256,21 @@ model Collaboration {
   @@index([status])
 }
 
+model DirectMessage {
+  id         String   @id @default(cuid())
+  sender     User     @relation("SentMessages",     fields: [senderId],    references: [id], onDelete: Cascade)
+  senderId   String
+  receiver   User     @relation("ReceivedMessages", fields: [receiverId],  references: [id], onDelete: Cascade)
+  receiverId String
+  content    String
+  read       Boolean  @default(false)
+  createdAt  DateTime @default(now())
+
+  @@index([senderId])
+  @@index([receiverId])
+  @@index([createdAt])
+}
+
 model Notification {
   id        String   @id @default(cuid())
   user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
@@ -265,4 +285,32 @@ model Notification {
   @@index([userId])
   @@index([createdAt])
   @@index([read])
+}
+
+model Follow {
+  id          String   @id @default(cuid())
+  follower    User     @relation("Follower",  fields: [followerId],  references: [id], onDelete: Cascade)
+  followerId  String
+  following   User     @relation("Following", fields: [followingId], references: [id], onDelete: Cascade)
+  followingId String
+  createdAt   DateTime @default(now())
+
+  @@unique([followerId, followingId])
+  @@index([followerId])
+  @@index([followingId])
+}
+
+model Report {
+  id           String   @id @default(cuid())
+  reporterId   String
+  targetType   String   // POST | COMMENT | USER
+  targetId     String
+  reason       String
+  details      String?
+  status       String   @default("PENDING") // PENDING | REVIEWED | DISMISSED
+  createdAt    DateTime @default(now())
+
+  @@index([reporterId])
+  @@index([targetType, targetId])
+  @@index([status])
 }
