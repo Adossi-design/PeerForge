@@ -13,7 +13,7 @@ export default function DiscussionsPage() {
   const { data: discussions, isLoading } = useDiscussions();
 
   return (
-    <div className="px-8 py-8 w-full">
+    <div className="px-4 sm:px-8 py-8 w-full">
       <div className="mb-6">
         <h1 className="text-2xl font-bold text-white">Discussions</h1>
         <p className="text-sm mt-0.5" style={{ color: '#6b7280' }}>Join conversations and collaborate in real-time</p>
@@ -29,7 +29,7 @@ export default function DiscussionsPage() {
             <Link
               key={d.id}
               href={`/discussions/${d.id}`}
-              className="flex items-center gap-4 rounded-xl px-6 py-5 transition-colors"
+              className="card flex items-center gap-4 rounded-xl px-6 py-5 transition-colors"
               style={{ backgroundColor: '#1a1a1a', border: '1px solid #242424' }}
             >
               {/* Icon */}
