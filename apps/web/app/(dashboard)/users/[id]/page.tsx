@@ -1,11 +1,13 @@
 'use client';
 
-import React from 'react';
+import React, { useState } from 'react';
 import { useParams, useRouter } from 'next/navigation';
-import { ArrowLeft, Mail, MapPin, Github, Calendar, ExternalLink, Linkedin } from 'lucide-react';
+import { ArrowLeft, Mail, MapPin, Github, Calendar, ExternalLink, Linkedin, MessageCircle, UserPlus, UserCheck, Flag } from 'lucide-react';
 import { useQuery } from '@tanstack/react-query';
 import { useAuth } from '@clerk/nextjs';
 import { PostCard } from '@/components/features/posts/PostCard';
+import { useCurrentUser, useFollowCounts, useFollowStatus, useFollow } from '@/lib/hooks/useApi';
+import { ReportModal } from '@/components/common/ReportModal';
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001';
 
@@ -44,22 +46,27 @@ export default function UserProfilePage() {
 
   const user = userData;
   const posts = postsData?.posts ?? [];
+  const { data: currentUser } = useCurrentUser();
+  const { data: followCounts } = useFollowCounts(id as string);
+  const { data: followStatus } = useFollowStatus(id as string);
+  const followMutation = useFollow(id as string);
+  const [showReport, setShowReport] = useState(false);
   const initials = user?.fullName
     ? user.fullName.split(' ').map((w: string) => w[0]).join('').slice(0, 3).toUpperCase()
     : 'U';
 
   if (isLoading) return (
-    <div className="w-full px-8 py-8">
+    <div className="w-full px-4 sm:px-8 py-8">
       <div className="h-64 rounded-2xl animate-pulse mx-auto" style={{ backgroundColor: '#1a1a1a', maxWidth: '760px' }} />
     </div>
   );
 
   if (!user) return (
-    <div className="w-full px-8 py-8 text-center" style={{ color: '#6b7280' }}>User not found.</div>
+    <div className="w-full px-4 sm:px-8 py-8 text-center" style={{ color: '#6b7280' }}>User not found.</div>
   );
 
   return (
-    <div className="w-full px-8 py-8">
+    <div className="w-full px-4 sm:px-8 py-8">
       <button onClick={() => router.back()}
         className="flex items-center gap-2 text-sm mb-6 transition-colors hover:text-white"
         style={{ color: '#6b7280' }}>
@@ -85,6 +92,35 @@ export default function UserProfilePage() {
                 <p className="text-sm" style={{ color: '#6b7280' }}>@{user.username}</p>
               </div>
             </div>
+            {currentUser && currentUser.id !== user.id && (
+              <div className="flex items-center gap-2 mb-1">
+                <button
+                  onClick={() => followMutation.mutate()}
+                  className="flex items-center gap-2 text-sm font-medium px-4 py-1.5 rounded-lg transition-colors hover:opacity-90"
+                  style={followStatus?.following
+                    ? { backgroundColor: '#242424', color: '#d1d5db', border: '1px solid #3f3f3f' }
+                    : { backgroundColor: '#4f46e5', color: '#fff' }}
+                >
+                  {followStatus?.following
+                    ? <><UserCheck className="w-4 h-4" />Following</>
+                    : <><UserPlus className="w-4 h-4" />Follow</>}
+                </button>
+                <button
+                  onClick={() => router.push(`/messages/${user.id}`)}
+                  className="flex items-center gap-2 text-sm font-medium px-4 py-1.5 rounded-lg transition-colors hover:opacity-90"
+                  style={{ backgroundColor: '#1a1a1a', color: '#d1d5db', border: '1px solid #3f3f3f' }}
+                >
+                  <MessageCircle className="w-4 h-4" />Message
+                </button>
+                <button
+                  onClick={() => setShowReport(true)}
+                  className="flex items-center gap-2 text-sm font-medium px-3 py-1.5 rounded-lg transition-colors hover:text-red-400"
+                  style={{ backgroundColor: '#1a1a1a', color: '#6b7280', border: '1px solid #3f3f3f' }}
+                >
+                  <Flag className="w-4 h-4" />
+                </button>
+              </div>
+            )}
           </div>
 
           {user.bio && <p className="text-sm mb-3" style={{ color: '#9ca3af' }}>{user.bio}</p>}
@@ -117,10 +153,15 @@ export default function UserProfilePage() {
           </div>
 
           <div className="flex gap-8 mb-5 text-sm">
-            {[{ label: 'Posts', value: posts.length }, { label: 'Rep', value: user.reputation ?? 0 }, { label: 'Badges', value: 0 }].map(({ label, value }) => (
+            {[
+              { label: 'Posts', value: posts.length },
+              { label: 'Followers', value: followCounts?.followers ?? 0 },
+              { label: 'Following', value: followCounts?.following ?? 0 },
+              { label: 'Rep', value: user.reputation ?? 0, accent: true },
+            ].map(({ label, value, accent }) => (
               <div key={label}>
-                <span className="font-bold text-white text-base">{value}</span>
-                <span className="ml-1.5" style={{ color: '#6b7280' }}>{label}</span>
+                <span className="font-bold text-base" style={{ color: accent ? '#a78bfa' : '#ffffff' }}>{value}</span>
+                <span className="ml-1.5" style={{ color: '#9ca3af' }}>{label}</span>
               </div>
             ))}
           </div>
@@ -159,6 +200,14 @@ export default function UserProfilePage() {
             : <div className="text-center py-12 text-sm" style={{ color: '#6b7280' }}>No posts yet.</div>}
         </div>
       </div>
+
+      {showReport && (
+        <ReportModal
+          targetType="USER"
+          targetId={user.id}
+          onClose={() => setShowReport(false)}
+        />
+      )}
     </div>
   );
 }
