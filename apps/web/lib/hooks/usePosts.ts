@@ -29,14 +29,15 @@ export interface Post {
   status: string;
   visibility: string;
   tags: string[];
-  attachments?: { name: string; url: string; size: number; type: string }[];
+  attachments: { name: string; url: string; size: number; type: string }[];
   teamSize?: number;
   deadline?: string;
   budget?: string;
   repositoryUrl?: string;
   createdAt: string;
   author: { id: string; username: string; avatarUrl?: string };
-  _count: { comments: number; likes: number };
+  _count: { comments: number; likes: number; savedBy: number };
+  shareCount?: number;
   isLiked?: boolean;
   isSaved?: boolean;
 }
@@ -61,10 +62,15 @@ export function usePosts(skip = 0, take = 20) {
   return useQuery<Post[]>({
     queryKey: ['posts', skip, take],
     queryFn: async () => {
-      const token = await getToken();
+      // Posts are public — token is optional, just enriches liked/saved state
+      let token: string | null = null;
+      try { token = await getToken(); } catch {}
       const data = await fetchWithToken(`/posts?skip=${skip}&take=${take}`, token);
       return data.posts as Post[];
     },
+    // Always fetch — posts are public and visible to everyone
+    enabled: true,
+    staleTime: 30_000,
   });
 }
 
@@ -90,7 +96,10 @@ export function useCreatePost() {
       const token = await getToken();
       return fetchWithToken('/posts', token, { method: 'POST', body: JSON.stringify(body) });
     },
-    onSuccess: () => qc.invalidateQueries({ queryKey: ['posts'] }),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['posts'] });
+      qc.invalidateQueries({ queryKey: ['current-user'] });
+    },
   });
 }
 
@@ -113,6 +122,7 @@ export function useLikePost() {
       qc.setQueryData(['post', postId], (old: Post | undefined) =>
         old ? { ...old, _count: { ...old._count, likes: old._count.likes + (data.liked ? 1 : -1) }, isLiked: data.liked } : old
       );
+      if (data.liked) qc.invalidateQueries({ queryKey: ['current-user'] });
     },
   });
 }
@@ -126,14 +136,45 @@ export function useSavePost() {
       return fetchWithToken(`/posts/${postId}/save`, token, { method: 'POST' });
     },
     onSuccess: (data, postId) => {
-      qc.setQueriesData({ queryKey: ['posts'] }, (old: Post[] | undefined) =>
-        old?.map((p) => p.id === postId ? { ...p, isSaved: data.saved } : p)
-      );
-      qc.setQueryData(['post', postId], (old: Post | undefined) =>
-        old ? { ...old, isSaved: data.saved } : old
-      );
+      const delta = data.saved ? 1 : -1;
+      const update = (p: Post) => p.id === postId
+        ? { ...p, isSaved: data.saved, _count: { ...p._count, savedBy: Math.max(0, (p._count?.savedBy ?? 0) + delta) } }
+        : p;
+      qc.setQueriesData({ queryKey: ['posts'] }, (old: Post[] | undefined) => old?.map(update));
+      qc.setQueriesData({ queryKey: ['user-posts'] }, (old: Post[] | undefined) => old?.map(update));
+      qc.setQueryData(['post', postId], (old: Post | undefined) => old ? update(old) : old);
       qc.invalidateQueries({ queryKey: ['saved-posts'] });
     },
+  });
+}
+
+export function useSharePost() {
+  const { getToken } = useAuth();
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async (postId: string) => {
+      const token = await getToken();
+      return fetchWithToken(`/posts/${postId}/share`, token, { method: 'POST' });
+    },
+    onSuccess: (data, postId) => {
+      const update = (p: Post) => p.id === postId ? { ...p, shareCount: data.shareCount } : p;
+      qc.setQueriesData({ queryKey: ['posts'] }, (old: Post[] | undefined) => old?.map(update));
+      qc.setQueryData(['post', postId], (old: Post | undefined) => old ? update(old) : old);
+    },
+  });
+}
+
+export function useUserPosts(userId: string) {
+  const { getToken } = useAuth();
+  return useQuery<Post[]>({
+    queryKey: ['user-posts', userId],
+    queryFn: async () => {
+      let token: string | null = null;
+      try { token = await getToken(); } catch {}
+      const data = await fetchWithToken(`/posts/user/${userId}`, token);
+      return data.posts ?? data;
+    },
+    enabled: !!userId,
   });
 }
 
@@ -181,6 +222,23 @@ export function useCreateComment() {
         body: JSON.stringify({ content: input.content, postId: input.postId }),
       });
     },
-    onSuccess: (_, vars) => qc.invalidateQueries({ queryKey: ['comments', vars.postId] }),
+    onSuccess: (_, vars) => {
+      qc.invalidateQueries({ queryKey: ['comments', vars.postId] });
+      qc.invalidateQueries({ queryKey: ['current-user'] });
+    },
+  });
+}
+
+export function useDeleteComment() {
+  const { getToken } = useAuth();
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async ({ commentId }: { commentId: string; postId: string }) => {
+      const token = await getToken();
+      return fetchWithToken(`/comments/${commentId}`, token, { method: 'DELETE' });
+    },
+    onSuccess: (_, { postId }) => {
+      qc.invalidateQueries({ queryKey: ['comments', postId] });
+    },
   });
 }
