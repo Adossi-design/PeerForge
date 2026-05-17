@@ -9,10 +9,12 @@ export default function SavedPage() {
   const { data: posts, isLoading } = useSavedPosts();
 
   return (
-    <div className="w-full px-8 py-8">
+    <div className="w-full px-4 sm:px-8 py-8">
       <div className="mb-6">
         <h1 className="text-2xl font-bold text-white">Saved Posts</h1>
-        <p className="text-sm mt-0.5" style={{ color: '#6b7280' }}>Posts you've bookmarked</p>
+        <p className="text-sm mt-0.5" style={{ color: '#6b7280' }}>
+          {posts && posts.length > 0 ? `${posts.length} bookmarked post${posts.length !== 1 ? 's' : ''}` : 'Posts you\'ve bookmarked'}
+        </p>
       </div>
 
       <div className="space-y-4">
