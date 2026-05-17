@@ -3,6 +3,7 @@ import { io, Socket } from 'socket.io-client';
 const SOCKET_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001';
 
 let socket: Socket | null = null;
+let dmSocket: Socket | null = null;
 
 export function getSocket(): Socket {
   if (!socket) {
@@ -14,21 +15,20 @@ export function getSocket(): Socket {
       transports: ['websocket', 'polling'],
       withCredentials: true,
     });
+  }
+  return socket;
+}
 
-    socket.on('connect', () => {
-      console.log('✓ Connected to discussions server');
-    });
-
-    socket.on('disconnect', () => {
-      console.log('✗ Disconnected from discussions server');
-    });
-
-    socket.on('error', (error) => {
-      console.error('Socket error:', error);
+export function getDmSocket(): Socket {
+  if (!dmSocket) {
+    dmSocket = io(`${SOCKET_URL}/dm`, {
+      reconnection: true,
+      reconnectionDelay: 1000,
+      transports: ['websocket', 'polling'],
+      withCredentials: true,
     });
   }
-
-  return socket;
+  return dmSocket;
 }
 
 export function disconnectSocket() {
