@@ -1,9 +1,10 @@
 'use client';
 
 import React, { useState, useEffect, useRef } from 'react';
-import { Save, LogOut, X, ChevronDown, Camera, Plus } from 'lucide-react';
+import { Save, LogOut, X, ChevronDown, Camera } from 'lucide-react';
 import { useCurrentUser, useUpdateProfile } from '@/lib/hooks/useApi';
 import { useClerk } from '@clerk/nextjs';
+import { useToast } from '@/components/common/Toast';
 
 const SKILL_LEVELS = ['Beginner', 'Intermediate', 'Advanced', 'Expert'];
 
@@ -30,6 +31,7 @@ export default function SettingsPage() {
   const updateProfile = useUpdateProfile();
   const { signOut } = useClerk();
   const fileRef = useRef<HTMLInputElement>(null);
+  const toast = useToast();
 
   const [avatarPreview, setAvatarPreview] = useState<string | null>(null);
   const [uploading, setUploading] = useState(false);
@@ -90,15 +92,20 @@ export default function SettingsPage() {
   const handleSave = async () => {
     if (!user?.id) return;
     const { skillLevel, ...formData } = form;
-    await updateProfile.mutateAsync({
-      id: user.id,
-      data: {
-        ...formData,
-        skills,
-        interests,
-        ...(avatarPreview ? { avatarUrl: avatarPreview } : {}),
-      } as any,
-    });
+    try {
+      await updateProfile.mutateAsync({
+        id: user.id,
+        data: {
+          ...formData,
+          skills,
+          interests,
+          ...(avatarPreview ? { avatarUrl: avatarPreview } : {}),
+        } as any,
+      });
+      toast('Profile saved successfully!');
+    } catch {
+      toast('Failed to save profile. Please try again.', 'error');
+    }
   };
 
   const avatarSrc = avatarPreview ?? user?.avatarUrl ?? null;
@@ -118,19 +125,19 @@ export default function SettingsPage() {
   } as React.CSSProperties;
 
   if (isLoading) return (
-    <div className="w-full px-8 py-8">
+    <div className="w-full px-4 sm:px-8 py-8">
       <div className="h-96 rounded-2xl animate-pulse mx-auto" style={{ backgroundColor: '#1a1a1a', maxWidth: '680px' }} />
     </div>
   );
 
   return (
-    <div className="w-full px-8 py-8">
+    <div className="w-full px-4 sm:px-8 py-8">
       <div className="mb-6 mx-auto" style={{ maxWidth: '680px' }}>
         <h1 className="text-2xl font-bold text-white">Settings</h1>
         <p className="text-sm mt-0.5" style={{ color: '#6b7280' }}>Manage your profile and preferences</p>
       </div>
 
-      <div className="rounded-2xl p-6 mx-auto" style={{ backgroundColor: '#1a1a1a', border: '1px solid #242424', maxWidth: '680px' }}>
+      <div className="card rounded-2xl p-6 mx-auto" style={{ backgroundColor: '#1a1a1a', border: '1px solid #242424', maxWidth: '680px' }}>
         <div className="space-y-5">
 
           {/* Avatar */}
@@ -285,15 +292,6 @@ export default function SettingsPage() {
               {updateProfile.isPending ? 'Saving...' : 'Save Changes'}
             </button>
           </div>
-
-          {updateProfile.isSuccess && (
-            <p className="text-xs text-center" style={{ color: '#22c55e' }}>Profile saved successfully!</p>
-          )}
-          {updateProfile.isError && (
-            <p className="text-xs text-center" style={{ color: '#ef4444' }}>
-              {(updateProfile.error as Error).message}
-            </p>
-          )}
         </div>
       </div>
     </div>
