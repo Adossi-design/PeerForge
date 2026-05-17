@@ -20,6 +20,7 @@ export default function PostsPage() {
     tags: '',
     teamSize: 1,
   });
+  const [attachments, setAttachments] = useState<File[]>([]);
 
   const { data: posts, isLoading, error: fetchError } = usePosts();
   const createPostMutation = useCreatePost();
@@ -35,6 +36,17 @@ export default function PostsPage() {
       ...prev,
       [name]: name === 'teamSize' ? parseInt(value) : value,
     }));
+  };
+
+  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const files = Array.from(e.target.files || []);
+    setAttachments((prev) => [...prev, ...files]);
+    // Reset the input
+    e.target.value = '';
+  };
+
+  const removeAttachment = (index: number) => {
+    setAttachments((prev) => prev.filter((_, i) => i !== index));
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -55,6 +67,47 @@ export default function PostsPage() {
         userId: user?.id,
       });
 
+      // Convert files to base64 attachments
+      const convertedAttachments = await Promise.all(
+        attachments.map(
+          (file) =>
+            new Promise<{ name: string; url: string; size: number; type: string }>(
+              (resolve) => {
+                const reader = new FileReader();
+                reader.onload = (e) => {
+                  resolve({
+                    name: file.name,
+                    url: e.target?.result as string,
+                    size: file.size,
+                    type: file.type,
+                  });
+                };
+                reader.readAsDataURL(file);
+              }
+            )
+        )
+      );
+
+  const postData: any = {
+        title: formData.title,
+        description: formData.description,
+        type: formData.type,
+        status: formData.status,
+        visibility: formData.visibility,
+        tags: formData.tags
+          .split(',')
+          .map((t) => t.trim())
+          .filter((t) => t),
+        teamSize: formData.teamSize,
+        userId: user?.id,
+      };
+
+      if (convertedAttachments.length > 0) {
+        postData.attachments = convertedAttachments;
+      }
+
+      await createPostMutation.mutateAsync(postData);
+
       setFormData({
         title: '',
         description: '',
@@ -64,6 +117,7 @@ export default function PostsPage() {
         tags: '',
         teamSize: 1,
       });
+      setAttachments([]);
       setShowCreateForm(false);
     } catch (error) {
       console.error('Failed to create post:', error);
@@ -212,6 +266,52 @@ export default function PostsPage() {
                   rows={4}
                   className="mt-1 block w-full rounded-md border border-slate-300 px-3 py-2 shadow-sm focus:border-blue-500 focus:outline-none"
                   placeholder="Describe your project..."
+
+                              <div>
+                                <label className="block text-sm font-medium text-slate-700">
+                                  Attachments (Optional)
+                                </label>
+                                <div className="mt-1 flex items-center gap-2">
+                                  <input
+                                    type="file"
+                                    multiple
+                                    onChange={handleFileChange}
+                                    className="block w-full rounded-md border border-slate-300 px-3 py-2 shadow-sm focus:border-blue-500 focus:outline-none"
+                                  />
+                                </div>
+                              </div>
+
+                              {attachments.length > 0 && (
+                                <div>
+                                  <label className="block text-sm font-medium text-slate-700">
+                                    Selected Files ({attachments.length})
+                                  </label>
+                                  <div className="mt-2 space-y-2">
+                                    {attachments.map((file, index) => (
+                                      <div
+                                        key={index}
+                                        className="flex items-center justify-between rounded-md border border-slate-200 bg-slate-50 px-3 py-2"
+                                      >
+                                        <div className="flex items-center gap-2">
+                                          <span className="text-sm text-slate-600">
+                                            {file.name}
+                                          </span>
+                                          <span className="text-xs text-slate-500">
+                                            ({(file.size / 1024).toFixed(2)} KB)
+                                          </span>
+                                        </div>
+                                        <button
+                                          type="button"
+                                          onClick={() => removeAttachment(index)}
+                                          className="text-red-600 hover:text-red-700 font-medium text-sm"
+                                        >
+                                          Remove
+                                        </button>
+                                      </div>
+                                    ))}
+                                  </div>
+                                </div>
+                              )}
                 />
               </div>
 
