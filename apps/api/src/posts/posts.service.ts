@@ -1,11 +1,12 @@
 import { Injectable, NotFoundException, ForbiddenException } from '@nestjs/common';
 import { PrismaService } from '@/database/prisma.service';
 import { CreatePostDto, UpdatePostDto } from './dto/post.dto';
-import { PostVisibility } from '@/types';
+import { PostVisibility, NotificationType } from '@/types';
+import { NotificationsService } from '@/notifications/notifications.service';
 
 const POST_INCLUDE = {
   author: { select: { id: true, username: true, avatarUrl: true } },
-  _count: { select: { comments: true, likes: true } },
+  _count: { select: { comments: true, likes: true, savedBy: true } },
 };
 
 function parseTags(post: any) {
@@ -24,7 +25,10 @@ function parseTags(post: any) {
 
 @Injectable()
 export class PostsService {
-  constructor(private prisma: PrismaService) {}
+  constructor(
+    private prisma: PrismaService,
+    private notifications: NotificationsService,
+  ) {}
 
   async createPost(authorId: string, data: CreatePostDto) {
     // Resolve to prisma user id
@@ -48,7 +52,7 @@ export class PostsService {
         deadline: data.deadline ? new Date(data.deadline) : null,
         budget: data.budget,
         repositoryUrl: data.repositoryUrl,
-        attachments: (data as any).attachments ? JSON.stringify((data as any).attachments) : null,
+        attachments: data.attachments ? JSON.stringify(data.attachments) : null,
         authorId: user.id,
       },
       include: POST_INCLUDE,
@@ -59,6 +63,9 @@ export class PostsService {
         await this.prisma.postSkill.create({ data: { postId: post.id, skillId } }).catch(() => {});
       }
     }
+
+    // +1 rep for posting
+    await this.prisma.user.update({ where: { id: user.id }, data: { reputation: { increment: 1 } } }).catch(() => {});
 
     // Create associated discussion room
     await this.prisma.discussion.create({
@@ -73,7 +80,7 @@ export class PostsService {
     return parseTags(post);
   }
 
-  async getPostById(id: string) {
+  async getPostById(id: string, userId?: string) {
     const post = await this.prisma.post.findUnique({
       where: { id },
       include: {
@@ -84,10 +91,11 @@ export class PostsService {
     });
     if (!post) throw new NotFoundException('Post not found');
     await this.prisma.post.update({ where: { id }, data: { viewCount: { increment: 1 } } });
-    return parseTags(post);
+    const [parsed] = await this.attachUserState([parseTags(post)], userId);
+    return parsed;
   }
 
-  async getFeed(skip = 0, take = 20) {
+  async getFeed(skip = 0, take = 20, userId?: string) {
     const posts = await this.prisma.post.findMany({
       where: { visibility: PostVisibility.PUBLIC },
       skip,
@@ -95,7 +103,7 @@ export class PostsService {
       orderBy: { createdAt: 'desc' },
       include: POST_INCLUDE,
     });
-    return posts.map(parseTags);
+    return this.attachUserState(posts.map(parseTags), userId);
   }
 
   async updatePost(postId: string, authorId: string, data: UpdatePostDto) {
@@ -140,7 +148,7 @@ export class PostsService {
     return posts.map(parseTags);
   }
 
-  async getUserPosts(userId: string, skip = 0, take = 20) {
+  async getUserPosts(userId: string, skip = 0, take = 20, requesterId?: string) {
     const posts = await this.prisma.post.findMany({
       where: { authorId: userId },
       skip,
@@ -148,7 +156,7 @@ export class PostsService {
       orderBy: { createdAt: 'desc' },
       include: POST_INCLUDE,
     });
-    return posts.map(parseTags);
+    return this.attachUserState(posts.map(parseTags), requesterId);
   }
 
   async likePost(postId: string, userId: string) {
@@ -160,11 +168,28 @@ export class PostsService {
       return { liked: false };
     }
     await this.prisma.like.create({ data: { userId, postId } });
+
+    // Notify post author (skip if liking own post)
+    const post = await this.prisma.post.findUnique({
+      where: { id: postId },
+      include: { author: { select: { id: true, username: true } } },
+    });
+    const liker = await this.prisma.user.findUnique({ where: { id: userId }, select: { username: true } });
+    if (post && post.authorId !== userId) {
+      await this.notifications.createNotification(
+        post.authorId,
+        NotificationType.LIKE,
+        `${liker?.username ?? 'Someone'} liked your post`,
+        post.title,
+        `/posts/${postId}`,
+      );
+      // +2 rep for post author when liked
+      await this.prisma.user.update({ where: { id: post.authorId }, data: { reputation: { increment: 2 } } }).catch(() => {});
+    }
     return { liked: true };
   }
 
   async savePost(postId: string, userId: string) {
-    // Check if already saved
     const existing = await this.prisma.savedPost.findUnique({
       where: { userId_postId: { userId, postId } },
     }).catch(() => null);
@@ -178,6 +203,12 @@ export class PostsService {
     return { saved: true };
   }
 
+  async sharePost(postId: string) {
+    await this.prisma.post.update({ where: { id: postId }, data: { shareCount: { increment: 1 } } }).catch(() => {});
+    const post = await this.prisma.post.findUnique({ where: { id: postId }, select: { shareCount: true } });
+    return { shareCount: post?.shareCount ?? 0 };
+  }
+
   async getSavedPosts(userId: string) {
     const saved = await this.prisma.savedPost.findMany({
       where: { userId },
@@ -185,12 +216,33 @@ export class PostsService {
         post: {
           include: {
             author: { select: { id: true, username: true, avatarUrl: true } },
-            _count: { select: { comments: true, likes: true } },
+            _count: { select: { comments: true, likes: true, savedBy: true } },
           },
         },
       },
       orderBy: { createdAt: 'desc' },
     }).catch(() => []);
-    return saved.map((s: any) => parseTags(s.post)).filter(Boolean);
+    const posts = saved.map((s: any) => parseTags(s.post)).filter(Boolean);
+    return this.attachUserState(posts, userId);
+  }
+
+  private async attachUserState(posts: any[], userId?: string) {
+    if (!userId || posts.length === 0) return posts.map((p: any) => ({ ...p, isLiked: false, isSaved: false }));
+
+    const postIds = posts.map((p: any) => p.id);
+
+    const [likes, saves] = await Promise.all([
+      this.prisma.like.findMany({ where: { userId, postId: { in: postIds } }, select: { postId: true } }),
+      this.prisma.savedPost.findMany({ where: { userId, postId: { in: postIds } }, select: { postId: true } }),
+    ]);
+
+    const likedSet = new Set(likes.map((l) => l.postId));
+    const savedSet = new Set(saves.map((s) => s.postId));
+
+    return posts.map((p: any) => ({
+      ...p,
+      isLiked: likedSet.has(p.id),
+      isSaved: savedSet.has(p.id),
+    }));
   }
 }
