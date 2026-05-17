@@ -53,7 +53,13 @@ export class AuthService {
       try {
         const clerkUser = await clerk.users.getUser(clerkId);
         const email = clerkUser.emailAddresses[0]?.emailAddress ?? `${clerkId}@unknown.local`;
-        const username = clerkUser.username ?? clerkUser.firstName?.toLowerCase() ?? `user_${clerkId.slice(-8)}`;
+        const rawUsername = clerkUser.username
+          ?? (clerkUser.firstName && clerkUser.lastName
+            ? `${clerkUser.firstName.toLowerCase()}${clerkUser.lastName.toLowerCase()}`
+            : clerkUser.firstName
+              ? `${clerkUser.firstName.toLowerCase()}${clerkId.slice(-4)}`
+              : `user_${clerkId.slice(-8)}`);
+        const username = rawUsername;
 
         const existingByEmail = await this.prisma.user.findUnique({ where: { email } });
         const existingByUsername = await this.prisma.user.findUnique({ where: { username } });
