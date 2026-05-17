@@ -2,36 +2,35 @@
 
 import React from 'react';
 import { Mail, MapPin, Github, Calendar, ExternalLink, Linkedin } from 'lucide-react';
-import { useCurrentUser } from '@/lib/hooks/useApi';
-import { usePosts } from '@/lib/hooks/usePosts';
+import { useCurrentUser, useFollowCounts } from '@/lib/hooks/useApi';
+import { useUserPosts } from '@/lib/hooks/usePosts';
 import { PostCard } from '@/components/features/posts/PostCard';
 import Link from 'next/link';
 
 export default function ProfilePage() {
   const { data: user, isLoading } = useCurrentUser();
-  const { data: posts } = usePosts();
-
-  const myPosts = (posts ?? []).filter((p) => p.author?.id === user?.id);
+  const { data: myPosts } = useUserPosts(user?.id ?? '');
+  const { data: followCounts } = useFollowCounts(user?.id ?? '');
   const initials = user?.fullName
     ? user.fullName.split(' ').map((w) => w[0]).join('').slice(0, 3).toUpperCase()
     : 'U';
 
   if (isLoading) return (
-    <div className="w-full px-8 py-8">
+    <div className="w-full px-4 sm:px-8 py-8">
       <div className="h-64 rounded-2xl animate-pulse mx-auto" style={{ backgroundColor: '#1a1a1a', maxWidth: '760px' }} />
     </div>
   );
 
   return (
-    <div className="w-full px-8 py-8">
+    <div className="w-full px-4 sm:px-8 py-8">
       {/* Profile Card */}
-      <div className="rounded-2xl overflow-hidden mb-8 mx-auto"
+      <div className="card rounded-2xl overflow-hidden mb-8 mx-auto"
         style={{ backgroundColor: '#1a1a1a', border: '1px solid #242424', maxWidth: '760px' }}>
 
         {/* Banner */}
         <div style={{ height: '110px', background: 'linear-gradient(135deg, #3b1f6e 0%, #1a2a5e 50%, #0f3d3d 100%)' }} />
 
-        <div className="px-6" style={{ marginTop: '-40px' }}>
+        <div className="px-6 pb-6" style={{ marginTop: '-40px' }}>
           {/* Avatar + Name + Edit button */}
           <div className="flex items-end justify-between mb-4">
             <div className="flex items-end gap-4">
@@ -41,14 +40,14 @@ export default function ProfilePage() {
                   ? <img src={user.avatarUrl} alt="avatar" className="w-full h-full object-cover" />
                   : initials}
               </div>
-              <div className="pb-1">
+              <div className="pb-1" style={{ textShadow: '0 1px 4px rgba(0,0,0,0.8)' }}>
                 <h2 className="text-lg font-bold text-white">{user?.fullName ?? 'Your Name'}</h2>
-                <p className="text-sm" style={{ color: '#6b7280' }}>@{user?.username ?? 'username'}</p>
+                <p className="text-sm text-white/70">@{user?.username ?? 'username'}</p>
               </div>
             </div>
             <Link href="/settings">
-              <button className="text-sm font-medium px-4 py-1.5 rounded-lg mb-1 hover:bg-white/5 transition-colors"
-                style={{ border: '1px solid #3f3f3f', color: '#d1d5db' }}>
+              <button className="text-sm font-medium px-4 py-1.5 rounded-lg mb-1 transition-colors"
+                style={{ border: '1px solid rgba(139,92,246,0.5)', color: '#c4b5fd', backgroundColor: 'rgba(79,70,229,0.15)' }}>
                 Edit Profile
               </button>
             </Link>
@@ -93,13 +92,14 @@ export default function ProfilePage() {
           {/* Stats */}
           <div className="flex gap-8 mb-5 text-sm">
             {[
-              { label: 'Posts', value: user?._count?.posts ?? myPosts.length },
-              { label: 'Rep', value: user?.reputation ?? 0 },
-              { label: 'Badges', value: 0 },
-            ].map(({ label, value }) => (
+              { label: 'Posts', value: user?._count?.posts ?? myPosts?.length ?? 0 },
+              { label: 'Followers', value: followCounts?.followers ?? 0 },
+              { label: 'Following', value: followCounts?.following ?? 0 },
+              { label: 'Rep', value: user?.reputation ?? 0, accent: true },
+            ].map(({ label, value, accent }) => (
               <div key={label}>
-                <span className="font-bold text-white text-base">{value}</span>
-                <span className="ml-1.5" style={{ color: '#6b7280' }}>{label}</span>
+                <span className="font-bold text-base" style={{ color: accent ? '#a78bfa' : '#ffffff' }}>{value}</span>
+                <span className="ml-1.5" style={{ color: '#9ca3af' }}>{label}</span>
               </div>
             ))}
           </div>
@@ -140,7 +140,7 @@ export default function ProfilePage() {
       <div className="mx-auto" style={{ maxWidth: '760px' }}>
         <h3 className="text-lg font-bold text-white mb-4">My Posts</h3>
         <div className="space-y-4">
-          {myPosts.length > 0
+          {myPosts && myPosts.length > 0
             ? myPosts.map((post) => <PostCard key={post.id} post={post} href={`/posts/${post.id}`} />)
             : <div className="text-center py-12 text-sm" style={{ color: '#6b7280' }}>No posts yet.</div>}
         </div>
