@@ -2,8 +2,9 @@
 
 import React, { useState, useRef } from 'react';
 import { X, Paperclip, Send } from 'lucide-react';
-import { useCreatePost } from '@/lib/hooks/usePosts';
 import { useAuth } from '@clerk/nextjs';
+import { useCreatePost } from '@/lib/hooks/usePosts';
+import { useToast } from '@/components/common/Toast';
 
 const POST_TYPES = [
   { value: 'COLLABORATION_REQUEST', label: 'Collaboration' },
@@ -23,9 +24,10 @@ const stageToStatus: Record<string, string> = {
 const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001';
 
 export function NewPostModal({ onClose }: { onClose: () => void }) {
-  const { getToken } = useAuth();
   const createPost = useCreatePost();
   const fileRef = useRef<HTMLInputElement>(null);
+  const toast = useToast();
+  const { getToken } = useAuth();
 
   const [form, setForm] = useState({
     title: '', description: '', type: 'COLLABORATION_REQUEST',
@@ -80,14 +82,19 @@ export function NewPostModal({ onClose }: { onClose: () => void }) {
     // Upload attachments using Clerk token
     if (attachedFiles.length > 0) {
       try {
-        const token = await getToken();
         const formData = new FormData();
         attachedFiles.forEach((f) => formData.append('files', f));
+        
+        const token = await getToken();
+        const headers: Record<string, string> = {};
+        if (token) {
+          headers.Authorization = `Bearer ${token}`;
+        }
+        
         const res = await fetch(`${API_URL}/uploads`, {
           method: 'POST',
-          headers: token ? { Authorization: `Bearer ${token}` } : {},
           body: formData,
-          credentials: 'include',
+          headers,
         });
         if (res.ok) {
           const data = await res.json();
@@ -99,10 +106,79 @@ export function NewPostModal({ onClose }: { onClose: () => void }) {
         console.error('Upload error:', err);
       }
     }
+      // Upload attachments using Clerk token
+      if (attachedFiles.length > 0) {
+        try {
+          const formData = new FormData();
+          attachedFiles.forEach((f) => formData.append('files', f));
+        
+          const token = await getToken();
+          console.log('Token obtained:', !!token);
+          const headers: Record<string, string> = {};
+          if (token) {
+            headers.Authorization = `Bearer ${token}`;
+            console.log('Authorization header set');
+          } else {
+            console.warn('No token available, upload may fail');
+          }
+        
+          const res = await fetch(`${API_URL}/uploads`, {
+            method: 'POST',
+            body: formData,
+            headers,
+          });
+          if (res.ok) {
+            const data = await res.json();
+            payload.attachments = data.files;
+            console.log('Upload successful:', data);
+          } else {
+            const errorText = await res.text();
+            console.error('Upload failed:', res.status, errorText);
+          }
+        } catch (err) {
+          console.error('Upload error:', err);
+        }
+      }
+      // Upload attachments using Clerk token
+      if (attachedFiles.length > 0) {
+        try {
+          const formData = new FormData();
+          attachedFiles.forEach((f) => formData.append('files', f));
+        
+          const token = await getToken();
+          console.log('Token obtained:', !!token);
+          const headers: Record<string, string> = {};
+          if (token) {
+            headers.Authorization = `Bearer ${token}`;
+            console.log('Authorization header set');
+          } else {
+            console.warn('No token available, upload may fail');
+          }
+        
+          const res = await fetch(`${API_URL}/uploads`, {
+            method: 'POST',
+            body: formData,
+            headers,
+          });
+          if (res.ok) {
+            const data = await res.json();
+            payload.attachments = data.files;
+            console.log('Upload successful:', data);
+          } else {
+            const errorText = await res.text();
+            console.error('Upload failed:', res.status, errorText);
+          }
+        } catch (err) {
+          console.error('Upload error:', err);
+        }
+      }
 
     try {
       await createPost.mutateAsync(payload);
+      toast('Post published successfully!');
       onClose();
+    } catch {
+      toast('Failed to publish post. Please try again.', 'error');
     } finally {
       setUploading(false);
     }
@@ -258,11 +334,6 @@ export function NewPostModal({ onClose }: { onClose: () => void }) {
             {isSubmitting ? (uploading && attachedFiles.length > 0 ? 'Uploading...' : 'Publishing...') : 'Publish Post'}
             <Send className="w-4 h-4" />
           </button>
-          {createPost.error && (
-            <p className="text-xs text-center mt-2" style={{ color: '#ef4444' }}>
-              {(createPost.error as Error).message}
-            </p>
-          )}
         </form>
       </div>
     </div>
