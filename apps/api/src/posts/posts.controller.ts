@@ -32,10 +32,12 @@ export class PostsController {
   async getFeed(
     @Query('skip') skip: string = '0',
     @Query('take') take: string = '20',
+    @Req() req: any,
   ) {
     const posts = await this.postsService.getFeed(
       parseInt(skip),
       parseInt(take),
+      req.user?.id,
     );
     return { posts };
   }
@@ -44,8 +46,8 @@ export class PostsController {
    * Get single post
    */
   @Get(':id')
-  async getPostById(@Param('id') id: string) {
-    const post = await this.postsService.getPostById(id);
+  async getPostById(@Param('id') id: string, @Req() req: any) {
+    const post = await this.postsService.getPostById(id, req.user?.id);
     return { post };
   }
 
@@ -129,11 +131,13 @@ export class PostsController {
     @Param('userId') userId: string,
     @Query('skip') skip: string = '0',
     @Query('take') take: string = '20',
+    @Req() req: any,
   ) {
     const posts = await this.postsService.getUserPosts(
       userId,
       parseInt(skip),
       parseInt(take),
+      req.user?.id,
     );
     return { posts };
   }
@@ -158,11 +162,12 @@ export class PostsController {
   @Post(':id/save')
   async savePost(@Param('id') postId: string, @Req() req: any) {
     const userId = req.user?.id;
-    if (!userId) {
-      throw new BadRequestException('User not authenticated');
-    }
+    if (!userId) throw new BadRequestException('User not authenticated');
+    return this.postsService.savePost(postId, userId);
+  }
 
-    const result = await this.postsService.savePost(postId, userId);
-    return result;
+  @Post(':id/share')
+  async sharePost(@Param('id') postId: string) {
+    return this.postsService.sharePost(postId);
   }
 }
