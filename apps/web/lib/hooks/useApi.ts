@@ -122,6 +122,8 @@ export function useCurrentUser() {
     queryKey: ['current-user'],
     queryFn: () => apiFetch('/auth/me').then((d) => d.user ?? d).catch(() => null),
     enabled: !!isSignedIn,
+    staleTime: 0,
+    refetchInterval: 10_000,
   });
 }
 
@@ -133,11 +135,160 @@ export function useUpdateProfile() {
       apiFetch(`/users/${id}`, { method: 'PUT', body: JSON.stringify(data) }),
     onSuccess: (response) => {
       const updatedUser = response?.user ?? response;
-      // Update cache immediately so profile reflects changes
       qc.setQueryData(['current-user'], (old: AppUser | null) => ({
         ...(old ?? {}),
         ...updatedUser,
       }));
+      qc.invalidateQueries({ queryKey: ['current-user'] });
+    },
+  });
+}
+
+// ── Collaborations ───────────────────────────────────────────
+export interface Collaboration {
+  id: string;
+  status: 'PENDING' | 'ACCEPTED' | 'REJECTED';
+  message?: string;
+  createdAt: string;
+  user?: { id: string; username: string; avatarUrl?: string };
+  post?: { id: string; title: string; type: string };
+}
+
+export function useCollaborationStatus(postId: string) {
+  const apiFetch = useApiFetch();
+  const { isSignedIn } = useAuth();
+  return useQuery<{ status: string | null; id: string | null }>({
+    queryKey: ['collab-status', postId],
+    queryFn: () => apiFetch(`/collaborations/posts/${postId}/status`),
+    enabled: !!isSignedIn && !!postId,
+  });
+}
+
+export function usePostCollaborations(postId: string) {
+  const apiFetch = useApiFetch();
+  return useQuery<Collaboration[]>({
+    queryKey: ['collaborations', postId],
+    queryFn: () => apiFetch(`/collaborations/posts/${postId}`).then((d) => d.collaborations ?? d),
+    enabled: !!postId,
+  });
+}
+
+export function useRequestCollaboration() {
+  const apiFetch = useApiFetch();
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: ({ postId, message }: { postId: string; message?: string }) =>
+      apiFetch(`/collaborations/posts/${postId}/request`, {
+        method: 'POST',
+        body: JSON.stringify({ message }),
+      }),
+    onSuccess: (_, { postId }) => {
+      qc.invalidateQueries({ queryKey: ['collab-status', postId] });
+      qc.invalidateQueries({ queryKey: ['collaborations', postId] });
+    },
+  });
+}
+
+export function useRespondCollaboration() {
+  const apiFetch = useApiFetch();
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: ({ id, accept, postId }: { id: string; accept: boolean; postId: string }) =>
+      apiFetch(`/collaborations/${id}/respond`, {
+        method: 'PUT',
+        body: JSON.stringify({ accept }),
+      }),
+    onSuccess: (_, { postId }) => {
+      qc.invalidateQueries({ queryKey: ['collaborations', postId] });
+      qc.invalidateQueries({ queryKey: ['current-user'] });
+    },
+  });
+}
+
+// ── Direct Messages ──────────────────────────────────────────
+export interface DirectMessage {
+  id: string;
+  content: string;
+  read: boolean;
+  createdAt: string;
+  senderId: string;
+  receiverId: string;
+  sender: { id: string; username: string; avatarUrl?: string; fullName?: string };
+}
+
+export interface DmConversation {
+  id: string;
+  content: string;
+  createdAt: string;
+  senderId: string;
+  receiverId: string;
+  read: boolean;
+  partner: { id: string; username: string; avatarUrl?: string; fullName?: string };
+}
+
+export function useDmInbox() {
+  const apiFetch = useApiFetch();
+  const { isSignedIn } = useAuth();
+  return useQuery<DmConversation[]>({
+    queryKey: ['dm-inbox'],
+    queryFn: () => apiFetch('/messages/inbox').then((d) => d.conversations ?? d),
+    enabled: !!isSignedIn,
+    refetchInterval: 5000,
+  });
+}
+
+export function useDmConversation(otherUserId: string) {
+  const apiFetch = useApiFetch();
+  const { isSignedIn } = useAuth();
+  return useQuery<DirectMessage[]>({
+    queryKey: ['dm-conversation', otherUserId],
+    queryFn: () => apiFetch(`/messages/${otherUserId}`).then((d) => d.messages ?? d),
+    enabled: !!isSignedIn && !!otherUserId,
+    refetchInterval: 3000,
+  });
+}
+
+export function useSendDm() {
+  const apiFetch = useApiFetch();
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: ({ receiverId, content }: { receiverId: string; content: string }) =>
+      apiFetch(`/messages/${receiverId}`, { method: 'POST', body: JSON.stringify({ content }) }),
+    onSuccess: (_, { receiverId }) => {
+      qc.invalidateQueries({ queryKey: ['dm-conversation', receiverId] });
+      qc.invalidateQueries({ queryKey: ['dm-inbox'] });
+    },
+  });
+}
+
+// ── Follows ──────────────────────────────────────────────────
+export function useFollowCounts(userId: string) {
+  const apiFetch = useApiFetch();
+  return useQuery<{ followers: number; following: number }>({
+    queryKey: ['follow-counts', userId],
+    queryFn: () => apiFetch(`/follows/${userId}/counts`),
+    enabled: !!userId,
+  });
+}
+
+export function useFollowStatus(userId: string) {
+  const apiFetch = useApiFetch();
+  const { isSignedIn } = useAuth();
+  return useQuery<{ following: boolean }>({
+    queryKey: ['follow-status', userId],
+    queryFn: () => apiFetch(`/follows/${userId}/status`),
+    enabled: !!isSignedIn && !!userId,
+  });
+}
+
+export function useFollow(userId: string) {
+  const apiFetch = useApiFetch();
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: () => apiFetch(`/follows/${userId}`, { method: 'POST' }),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['follow-status', userId] });
+      qc.invalidateQueries({ queryKey: ['follow-counts', userId] });
       qc.invalidateQueries({ queryKey: ['current-user'] });
     },
   });
