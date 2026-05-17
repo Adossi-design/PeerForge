@@ -2,6 +2,7 @@
 
 import React from 'react';
 import { Bell } from 'lucide-react';
+import { useRouter } from 'next/navigation';
 import { useNotifications, useMarkAllRead } from '@/lib/hooks/useApi';
 
 const TYPE_ICONS: Record<string, string> = {
@@ -12,12 +13,13 @@ const TYPE_ICONS: Record<string, string> = {
 export default function NotificationsPage() {
   const { data: notifications, isLoading } = useNotifications();
   const markAll = useMarkAllRead();
+  const router = useRouter();
 
   const unread = (notifications ?? []).filter((n) => !n.read).length;
   const isEmpty = !isLoading && (!notifications || notifications.length === 0);
 
   return (
-    <div className="w-full min-h-screen px-8 py-8">
+    <div className="w-full min-h-screen px-4 sm:px-8 py-8">
       {/* Header */}
       <div className="flex items-center justify-between mb-8">
         <div>
@@ -68,10 +70,12 @@ export default function NotificationsPage() {
           {notifications.map((n) => (
             <div
               key={n.id}
-              className="flex items-start gap-4 p-4 rounded-xl transition-colors"
+              onClick={() => n.link && router.push(n.link)}
+              className="card flex items-start gap-4 p-4 rounded-xl transition-colors"
               style={{
                 backgroundColor: n.read ? '#1a1a1a' : '#1a2a3a',
                 border: `1px solid ${n.read ? '#242424' : '#1e3a5f'}`,
+                cursor: n.link ? 'pointer' : 'default',
               }}
             >
               <div
