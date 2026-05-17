@@ -84,14 +84,14 @@ export default function ExplorePage() {
   });
 
   return (
-    <div className="px-8 py-8 w-full">
+    <div className="px-4 sm:px-8 py-8 w-full">
       <div className="mb-6">
         <h1 className="text-2xl font-bold text-white">Explore</h1>
         <p className="text-sm mt-0.5" style={{ color: '#6b7280' }}>Discover projects, ideas, and collaborators</p>
       </div>
 
       {/* Search + Filters */}
-      <div className="flex gap-3 mb-8">
+      <div className="flex flex-col sm:flex-row gap-3 mb-8">
         <div className="flex-1 relative">
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4" style={{ color: '#6b7280' }} />
           <input
