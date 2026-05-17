@@ -2,20 +2,19 @@
 
 import React, { useState } from 'react';
 import { Plus } from 'lucide-react';
-import { usePosts } from '@/lib/hooks/usePosts';
 import { useCurrentUser } from '@/lib/hooks/useApi';
+import { useUserPosts } from '@/lib/hooks/usePosts';
 import { PostCard } from '@/components/features/posts/PostCard';
 import { NewPostModal } from '@/components/features/posts/NewPostModal';
 
 export default function ProjectsPage() {
   const { data: currentUser } = useCurrentUser();
-  const { data: posts, isLoading } = usePosts();
+  const { data: myPosts, isLoading } = useUserPosts(currentUser?.id ?? '');
+
   const [showNewPost, setShowNewPost] = useState(false);
 
-  const myPosts = (posts ?? []).filter((p) => p.author?.id === currentUser?.id);
-
   return (
-    <div className="w-full min-h-screen px-8 py-8">
+    <div className="w-full min-h-screen px-4 sm:px-8 py-8">
       {/* Header */}
       <div className="flex items-start justify-between mb-8">
         <div>
@@ -38,7 +37,7 @@ export default function ProjectsPage() {
           [1, 2, 3].map((i) => (
             <div key={i} className="h-48 rounded-xl animate-pulse" style={{ backgroundColor: '#1a1a1a' }} />
           ))
-        ) : myPosts.length > 0 ? (
+        ) : myPosts && myPosts.length > 0 ? (
           myPosts.map((post) => <PostCard key={post.id} post={post} href={`/posts/${post.id}`} />)
         ) : (
           <div className="text-center py-16 text-sm" style={{ color: '#6b7280' }}>
