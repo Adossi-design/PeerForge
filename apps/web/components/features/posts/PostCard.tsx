@@ -1,11 +1,12 @@
 'use client';
 
-import React from 'react';
-import Link from 'next/link';
+import React, { useState } from 'react';
 import { useRouter } from 'next/navigation';
-import { Heart, MessageCircle, Bookmark, Users } from 'lucide-react';
-import { useLikePost, useSavePost } from '@/lib/hooks/usePosts';
+import { Heart, MessageCircle, Bookmark, Users, FileText, Share2 } from 'lucide-react';
+import { useLikePost, useSavePost, useSharePost } from '@/lib/hooks/usePosts';
 import type { Post } from '@/lib/hooks/usePosts';
+import { ImageLightbox } from '@/components/common/ImageLightbox';
+import { useToast } from '@/components/common/Toast';
 
 const TYPE_CONFIG: Record<string, { label: string; color: string }> = {
   COLLABORATION_REQUEST:    { label: 'Collaboration', color: '#60a5fa' },
@@ -20,6 +21,12 @@ const STATUS_LABELS: Record<string, string> = {
   IDEATION: 'Idea', PLANNING: 'Planning', IN_PROGRESS: 'In Progress',
   BETA: 'Testing', COMPLETED: 'Launched',
 };
+
+function isImage(a: { type?: string; name?: string }) {
+  if (a.type && a.type.startsWith('image/')) return true;
+  if (a.name) return /\.(png|jpe?g|gif|webp|svg)$/i.test(a.name);
+  return false;
+}
 
 export function Avatar({ name, avatarUrl, userId, size = 'sm', onClick }: {
   name: string; avatarUrl?: string; userId?: string; size?: 'sm' | 'md' | 'lg'; onClick?: (e: React.MouseEvent) => void;
@@ -45,12 +52,32 @@ export function PostCard({ post, href }: { post: Post; href: string }) {
   const type = TYPE_CONFIG[post.type] ?? TYPE_CONFIG.TECHNICAL_DISCUSSION;
   const statusLabel = STATUS_LABELS[post.status] ?? post.status;
   const tags = Array.isArray(post.tags) ? post.tags : [];
+  const attachments = Array.isArray(post.attachments) ? post.attachments : [];
+  const imageAttachments = attachments.filter(isImage);
+  const fileAttachments = attachments.filter((a) => !isImage(a));
   const likePost = useLikePost();
   const savePost = useSavePost();
+  const sharePost = useSharePost();
+  const toast = useToast();
+  const [lightboxIndex, setLightboxIndex] = useState<number | null>(null);
+
+  const handleShare = async (e: React.MouseEvent) => {
+    e.stopPropagation();
+    const url = `${window.location.origin}/posts/${post.id}`;
+    sharePost.mutate(post.id);
+    if (navigator.share) {
+      try {
+        await navigator.share({ title: post.title, text: post.description, url });
+      } catch {}
+    } else {
+      await navigator.clipboard.writeText(url);
+      toast('Link copied to clipboard!');
+    }
+  };
 
   return (
     <div
-      className="block rounded-xl px-6 py-5 transition-colors w-full cursor-pointer"
+      className="card block rounded-xl px-6 py-5 transition-colors w-full cursor-pointer"
       style={{ backgroundColor: '#1a1a1a', border: '1px solid #242424' }}
       onClick={() => router.push(href)}
     >
@@ -88,6 +115,47 @@ export function PostCard({ post, href }: { post: Post; href: string }) {
         </div>
       )}
 
+      {attachments.length > 0 && (
+        <div className="mb-4 space-y-2">
+          {imageAttachments.length > 0 && (
+            <div className="grid gap-2" style={{ gridTemplateColumns: 'repeat(auto-fill, minmax(160px, 1fr))' }}>
+              {imageAttachments.map((a, i) => (
+                <button
+                  key={i}
+                  onClick={(e) => { e.stopPropagation(); setLightboxIndex(i); }}
+                  className="block rounded-lg overflow-hidden hover:opacity-90 transition-opacity w-full"
+                  style={{ border: '1px solid #2f2f2f' }}
+                >
+                  <img src={a.url} alt={a.name} className="w-full object-cover" style={{ maxHeight: '160px' }} />
+                </button>
+              ))}
+            </div>
+          )}
+          {fileAttachments.length > 0 && (
+            <div className="flex flex-wrap gap-2">
+              {fileAttachments.map((a, i) => (
+                <a key={i} href={a.url} target="_blank" rel="noopener noreferrer"
+                  onClick={(e) => e.stopPropagation()}
+                  className="flex items-center gap-1.5 text-xs px-3 py-1 rounded-lg hover:opacity-80 transition-opacity"
+                  style={{ backgroundColor: '#1e3a5f', color: '#60a5fa', border: '1px solid #2d5a8e' }}
+                >
+                  <FileText className="w-3 h-3" />{a.name}
+                </a>
+              ))}
+            </div>
+          )}
+        </div>
+      )}
+
+      {lightboxIndex !== null && (
+        <ImageLightbox
+          images={imageAttachments}
+          index={lightboxIndex}
+          onClose={() => setLightboxIndex(null)}
+          onNav={setLightboxIndex}
+        />
+      )}
+
       {/* Footer */}
       <div className="flex items-center justify-between pt-3" style={{ borderTop: '1px solid #242424' }}>
         <div className="flex items-center gap-4 text-sm" style={{ color: '#6b7280' }}>
@@ -108,6 +176,15 @@ export function PostCard({ post, href }: { post: Post; href: string }) {
             style={{ color: post.isSaved ? '#60a5fa' : '#6b7280' }}
           >
             <Bookmark className="w-4 h-4" fill={post.isSaved ? '#60a5fa' : 'none'} />
+            {post._count?.savedBy ?? 0}
+          </button>
+          <button
+            onClick={handleShare}
+            className="flex items-center gap-1.5 hover:text-white transition-colors"
+            style={{ color: '#6b7280' }}
+          >
+            <Share2 className="w-4 h-4" />
+            {post.shareCount ?? 0}
           </button>
         </div>
         <div className="flex items-center gap-2 text-xs" style={{ color: '#6b7280' }}>
