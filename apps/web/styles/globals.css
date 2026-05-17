@@ -31,6 +31,52 @@
     --radius: 0.5rem;
 
     --font-sans: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+
+    /* App-wide semantic tokens (dark defaults) */
+    --bg-base:        #0d0d12;
+    --bg-surface:     #13121e;
+    --bg-surface-2:   #0f0e18;
+    --bg-elevated:    #1a1828;
+    --bg-input:       #13121e;
+    --border-subtle:  #1e1c2e;
+    --border-default: #252338;
+    --border-input:   #2e2b42;
+    --border-strong:  #3d3a55;
+    --text-primary:   #ffffff;
+    --text-secondary: #d1d5db;
+    --text-muted:     #9ca3af;
+    --text-faint:     #6b7280;
+  }
+
+  [data-theme="light"] {
+    --background: 220 30% 97%;
+    --foreground: 220 30% 8%;
+    --card: 0 0% 100%;
+    --card-foreground: 220 30% 8%;
+    --muted: 210 30% 94%;
+    --muted-foreground: 220 15% 40%;
+    --border: 210 40% 88%;
+    --input: 0 0% 100%;
+
+    /* Light mode: white base, soft lavender cards, vivid purple/indigo accents */
+    --bg-base:        #f4f2ff;
+    --bg-surface:     #ffffff;
+    --bg-surface-2:   #f0eeff;
+    --bg-elevated:    #e9e4ff;
+    --bg-card:        #ede8ff;
+    --bg-input:       #ffffff;
+    --border-subtle:  #ddd5f8;
+    --border-default: #c4b5f0;
+    --border-input:   #a99de0;
+    --border-strong:  #7c6bc8;
+    /* Text — dark enough for contrast on lavender */
+    --text-primary:   #12082a;
+    --text-secondary: #261550;
+    --text-muted:     #4a3580;
+    --text-faint:     #7060a8;
+    /* Accent — concentrated indigo/violet */
+    --accent-vivid:   #4f46e5;
+    --accent-soft:    #ede8ff;
   }
 
   * {
@@ -39,9 +85,156 @@
 
   body {
     @apply bg-background text-foreground;
-    background-color: #0d0d0d;
+    background-color: var(--bg-base);
+    color: var(--text-primary);
   }
 }
+
+/* ══════════════════════════════════════════════════════
+   LIGHT MODE — complete override
+   Sidebar stays dark (gradient). Everything else: light.
+   .card = all content panels (posts, comments, notifications,
+           discussions, messages, admin panels)
+   ALL text must be visible. No exceptions.
+   ══════════════════════════════════════════════════════ */
+
+/* ─ Page base ─ */
+[data-theme="light"],
+[data-theme="light"] body,
+[data-theme="light"] main { background-color: #f0eeff !important; color: #12082a !important; }
+
+/* ─ Left sidebar — dark navy in light mode, black in dark mode ─ */
+[data-theme="light"] aside.fixed { background: #1a1a2e !important; border-color: #16213e !important; }
+[data-theme="light"] aside.fixed *,
+[data-theme="light"] aside.fixed a,
+[data-theme="light"] aside.fixed button,
+[data-theme="light"] aside.fixed span,
+[data-theme="light"] aside.fixed p,
+[data-theme="light"] aside.fixed div { color: #c4b5fd !important; background-color: transparent !important; }
+/* Active nav item — purple block */
+[data-theme="light"] aside.fixed a[style*="#3d2b8e"] { background: #3d2b8e !important; }
+[data-theme="light"] aside.fixed a[style*="#3d2b8e"],
+[data-theme="light"] aside.fixed a[style*="#3d2b8e"] * { color: #ffffff !important; }
+/* Logo icon + New Post button — keep gradients */
+[data-theme="light"] aside.fixed [style*="linear-gradient"] { background: linear-gradient(135deg, #4f46e5, #7c3aed) !important; color: #ffffff !important; }
+[data-theme="light"] aside.fixed [style*="linear-gradient"] * { color: #ffffff !important; }
+/* Toggle pill background */
+[data-theme="light"] aside.fixed [style*="backgroundColor: #4f46e5"] { background-color: #4f46e5 !important; }
+/* Toggle pill white dot — keep white and visible */
+[data-theme="light"] aside.fixed span[style*="backgroundColor: #ffffff"] { background-color: #ffffff !important; }
+[data-theme="light"] aside.fixed div[style*="backgroundColor: #4f46e5"] { background-color: #4f46e5 !important; }
+/* Dividers */
+[data-theme="light"] aside.fixed .h-px { background: rgba(255,255,255,0.08) !important; }
+/* Badge numbers */
+[data-theme="light"] aside.fixed span[style*="backgroundColor: #ef4444"] { background-color: #ef4444 !important; color: #ffffff !important; }
+
+/* ─ Header & bottom nav — light mode gets white ─ */
+[data-theme="light"] header {
+  background-color: #ffffff !important;
+  border-color: #ddd5f8 !important;
+}
+[data-theme="light"] header .text-white,
+[data-theme="light"] header span,
+[data-theme="light"] header button { color: #12082a !important; }
+
+[data-theme="light"] nav {
+  background-color: #ffffff !important;
+  border-color: #ddd5f8 !important;
+}
+[data-theme="light"] nav a { color: #4a3580 !important; }
+[data-theme="light"] nav a .text-\[10px\] { color: #4a3580 !important; }
+
+/* ─ .card — ALL content panels ─ */
+[data-theme="light"] .card {
+  background-color: #ffffff !important;
+  border-color: #e5e7eb !important;
+}
+/* Right sidebar cards keep their own border, no forced left stripe */
+[data-theme="light"] aside.right-sidebar .card { border-left: 1px solid #e5e7eb !important; }
+/* Every text node inside a card must be dark */
+[data-theme="light"] .card,
+[data-theme="light"] .card * { color: #12082a !important; }
+/* Except colored accent elements we explicitly re-set below */
+[data-theme="light"] .card .text-red-400,
+[data-theme="light"] .card [style*="color: #f87171"],
+[data-theme="light"] .card [style*="color:#f87171"] { color: #dc2626 !important; }
+[data-theme="light"] .card [style*="color: #60a5fa"],
+[data-theme="light"] .card [style*="color:#60a5fa"] { color: #4338ca !important; }
+[data-theme="light"] .card [style*="color: #a78bfa"],
+[data-theme="light"] .card [style*="color:#a78bfa"] { color: #6d28d9 !important; }
+[data-theme="light"] .card [style*="color: #34d399"],
+[data-theme="light"] .card [style*="color:#34d399"] { color: #059669 !important; }
+[data-theme="light"] .card [style*="color: #fbbf24"],
+[data-theme="light"] .card [style*="color:#fbbf24"] { color: #d97706 !important; }
+[data-theme="light"] .card [style*="color: #fb923c"],
+[data-theme="light"] .card [style*="color:#fb923c"] { color: #ea580c !important; }
+[data-theme="light"] .card [style*="color: #f472b6"],
+[data-theme="light"] .card [style*="color:#f472b6"] { color: #db2777 !important; }
+/* Avatar circles inside cards */
+[data-theme="light"] .card .rounded-full { background-color: #ddd5f8 !important; }
+/* Chips/tags inside cards */
+[data-theme="light"] .card .rounded-full { border-color: #a99de0 !important; }
+/* Skill tags */
+[data-theme="light"] .card [style*="#1e3a5f"] {
+  background-color: #e0d9ff !important;
+  border-color: #a5b4fc !important;
+}
+/* Interest tags */
+[data-theme="light"] .card [style*="#2d1f5e"] {
+  background-color: #ede9fe !important;
+  border-color: #c4b5fd !important;
+}
+/* Dividers inside cards */
+[data-theme="light"] .card [style*="borderTop"],
+[data-theme="light"] .card [style*="border-top"] { border-color: #e2d9f3 !important; }
+[data-theme="light"] .card [style*="borderBottom"],
+[data-theme="light"] .card [style*="border-bottom"] { border-color: #e2d9f3 !important; }
+/* Buttons inside cards that have gradient bg — keep white text */
+[data-theme="light"] .card button[style*="gradient"],
+[data-theme="light"] .card button[style*="#4f46e5"],
+[data-theme="light"] .card button[style*="#2563eb"] { color: #ffffff !important; }
+/* Send/action buttons inside cards */
+[data-theme="light"] .card button[style*="backgroundColor: #4f46e5"],
+[data-theme="light"] .card button[style*="background-color: #4f46e5"] { color: #ffffff !important; }
+
+/* ─ Inputs ─ */
+[data-theme="light"] input:not([type="radio"]):not([type="checkbox"]),
+[data-theme="light"] textarea,
+[data-theme="light"] select {
+  background-color: #ffffff !important;
+  border-color: #a99de0 !important;
+  color: #12082a !important;
+}
+[data-theme="light"] input::placeholder,
+[data-theme="light"] textarea::placeholder { color: #7060a8 !important; }
+
+/* ─ Global page-level text (outside cards and left sidebar) ─ */
+[data-theme="light"] .text-white:not(aside.fixed):not(aside.fixed *) { color: #12082a !important; }
+[data-theme="light"] .text-gray-400:not(aside.fixed):not(aside.fixed *) { color: #4a3580 !important; }
+[data-theme="light"] .text-gray-500:not(aside.fixed):not(aside.fixed *) { color: #6b4fa0 !important; }
+[data-theme="light"] .hover\:text-white:hover:not(aside.fixed):not(aside.fixed *) { color: #12082a !important; }
+[data-theme="light"] .hover\:text-gray-200:hover:not(aside.fixed):not(aside.fixed *) { color: #261550 !important; }
+/* Inline style text colors on page level — exclude left sidebar */
+[data-theme="light"] :not(aside.fixed):not(aside.fixed *)[style*="color: #6b7280"],
+[data-theme="light"] :not(aside.fixed):not(aside.fixed *)[style*="color:#6b7280"] { color: #4a3580 !important; }
+[data-theme="light"] :not(aside.fixed):not(aside.fixed *)[style*="color: #9ca3af"],
+[data-theme="light"] :not(aside.fixed):not(aside.fixed *)[style*="color:#9ca3af"] { color: #4a3580 !important; }
+[data-theme="light"] :not(aside.fixed):not(aside.fixed *)[style*="color: #d1d5db"],
+[data-theme="light"] :not(aside.fixed):not(aside.fixed *)[style*="color:#d1d5db"] { color: #261550 !important; }
+[data-theme="light"] :not(aside.fixed):not(aside.fixed *)[style*="color: #ffffff"],
+[data-theme="light"] :not(aside.fixed):not(aside.fixed *)[style*="color:#ffffff"] { color: #12082a !important; }
+
+/* ─ Filter buttons / tab pills (outside cards) ─ */
+[data-theme="light"] button[style*="color: #9ca3af"],
+[data-theme="light"] button[style*="color:#9ca3af"] { color: #4a3580 !important; }
+[data-theme="light"] button[style*="#1e3a5f"] {
+  background-color: #e0d9ff !important;
+  color: #3730a3 !important;
+  border-color: #a5b4fc !important;
+}
+
+/* ─ Skeletons ─ */
+[data-theme="light"] .animate-pulse { background-color: #e9e4ff !important; }
 
 html {
   scroll-behavior: smooth;
