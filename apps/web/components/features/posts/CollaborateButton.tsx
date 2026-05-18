@@ -11,6 +11,7 @@ import {
 } from '@/lib/hooks/useApi';
 import { useCurrentUser } from '@/lib/hooks/useApi';
 import { useToast } from '@/components/common/Toast';
+import { useTheme } from '@/lib/context/ThemeContext';
 
 const STATUS_CONFIG = {
   PENDING:  { label: 'Request Sent', icon: Clock,  color: '#fbbf24', bg: '#2d2000' },
@@ -117,11 +118,13 @@ export function CollaboratorsPanel({ postId, isAuthor }: { postId: string; isAut
   const { data: collaborations } = usePostCollaborations(postId);
   const respond = useRespondCollaboration();
   const toast = useToast();
+  const { theme } = useTheme();
+  const isLight = theme === 'light';
 
   if (!collaborations || collaborations.length === 0) return null;
 
   return (
-    <div className="rounded-2xl p-5 mt-6" style={{ backgroundColor: '#1a1a1a', border: '1px solid #242424' }}>
+    <div className="card rounded-2xl p-5 mb-6" style={{ backgroundColor: isLight ? '#dbeafe' : '#1a1a1a', border: `1px solid ${isLight ? '#bfdbfe' : '#2f2f2f'}` }}>
       <h3 className="text-base font-bold text-white mb-4 flex items-center gap-2">
         <Users className="w-4 h-4" style={{ color: '#60a5fa' }} />
         Collaboration Requests ({collaborations.length})
@@ -130,7 +133,7 @@ export function CollaboratorsPanel({ postId, isAuthor }: { postId: string; isAut
         {collaborations.map((c: Collaboration) => {
           const cfg = STATUS_CONFIG[c.status as keyof typeof STATUS_CONFIG];
           return (
-            <div key={c.id} className="flex items-start gap-3 p-3 rounded-xl" style={{ backgroundColor: '#111', border: '1px solid #2a2a2a' }}>
+            <div key={c.id} className="flex items-start gap-3 p-3 rounded-xl" style={{ backgroundColor: isLight ? '#eff6ff' : '#111111', border: `1px solid ${isLight ? '#bfdbfe' : '#2f2f2f'}` }}>
               <div className="w-8 h-8 rounded-full flex items-center justify-center text-xs font-semibold text-white flex-shrink-0"
                 style={{ backgroundColor: '#2a2a2a' }}>
                 {c.user?.username?.slice(0, 2).toUpperCase() ?? 'U'}

@@ -28,9 +28,9 @@ export default function ProfilePage() {
         style={{ backgroundColor: '#1a1a1a', border: '1px solid #242424', maxWidth: '760px' }}>
 
         {/* Banner */}
-        <div style={{ height: '110px', background: 'linear-gradient(135deg, #3b1f6e 0%, #1a2a5e 50%, #0f3d3d 100%)' }} />
+        <div style={{ height: '120px', background: 'linear-gradient(135deg, #3b1f6e 0%, #1a2a5e 50%, #0f3d3d 100%)' }} />
 
-        <div className="px-6 pb-6" style={{ marginTop: '-40px' }}>
+        <div className="px-6 pb-6 relative" style={{ marginTop: '-50px' }}>
           {/* Avatar + Name + Edit button */}
           <div className="flex items-end justify-between mb-4">
             <div className="flex items-end gap-4">
@@ -40,7 +40,7 @@ export default function ProfilePage() {
                   ? <img src={user.avatarUrl} alt="avatar" className="w-full h-full object-cover" />
                   : initials}
               </div>
-              <div className="pb-1" style={{ textShadow: '0 1px 4px rgba(0,0,0,0.8)' }}>
+              <div className="pb-1 relative z-10" style={{ textShadow: '0 1px 4px rgba(0,0,0,0.8)' }}>
                 <h2 className="text-lg font-bold text-white">{user?.fullName ?? 'Your Name'}</h2>
                 <p className="text-sm text-white/70">@{user?.username ?? 'username'}</p>
               </div>

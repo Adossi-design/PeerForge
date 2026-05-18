@@ -124,6 +124,6 @@ export function useAdminLogout() {
   const router = useRouter();
   return useCallback(() => {
     clearAdminToken();
-    router.push('/login');
+    router.push('/admin/login');
   }, [router]);
 }

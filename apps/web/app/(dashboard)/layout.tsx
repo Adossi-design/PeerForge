@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { Home, Compass, FolderOpen, MessageSquare, Bell, User, Settings, Zap, Plus, Bookmark, Menu, X, Mail } from 'lucide-react';
@@ -38,6 +38,8 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
   const { theme, toggleTheme } = useTheme();
   const [showNewPost, setShowNewPost] = useState(false);
   const [sidebarOpen, setSidebarOpen] = useState(false);
+  const [scrollProgress, setScrollProgress] = useState(0);
+  const scrollRef = useRef<HTMLDivElement>(null);
   const { data: notifications } = useNotifications();
   const { data: currentUser } = useCurrentUser();
   const { data: dmInbox } = useDmInbox();
@@ -46,6 +48,76 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
   const unreadCount = (notifications ?? []).filter((n) => !n.read).length;
   const unreadDms = (dmInbox ?? []).filter((c) => !c.read && c.senderId !== currentUser?.id).length;
   const savedCount = savedPosts?.length ?? 0;
+
+  // Determine active section for header color
+  const getActiveSection = () => {
+    if (pathname.startsWith('/posts')) return 'posts';
+    if (pathname.startsWith('/users')) return 'users';
+    if (pathname.startsWith('/messages')) return 'messages';
+    if (pathname.startsWith('/notifications')) return 'notifications';
+    if (pathname.startsWith('/profile')) return 'profile';
+    if (pathname.startsWith('/settings')) return 'settings';
+    if (pathname.startsWith('/discussions')) return 'discussions';
+    if (pathname.startsWith('/projects')) return 'projects';
+    if (pathname.startsWith('/explore')) return 'explore';
+    if (pathname.startsWith('/saved')) return 'saved';
+    return 'home';
+  };
+
+  const activeSection = getActiveSection();
+
+  // Header color based on active section
+  const getHeaderGradient = () => {
+    switch (activeSection) {
+      case 'posts':
+        return 'linear-gradient(90deg, #1e3a5f, #2d5a8e, #1a4a4a)';
+      case 'users':
+        return 'linear-gradient(90deg, #3b1f6e, #1a2a5e, #2d1b69)';
+      case 'messages':
+        return 'linear-gradient(90deg, #1a4a4a, #2d5a5a, #1a3a3a)';
+      case 'notifications':
+        return 'linear-gradient(90deg, #4a2a1a, #5a3a2a, #3a2a1a)';
+      case 'profile':
+        return 'linear-gradient(90deg, #2a1a4a, #3a2a5a, #1a1a3a)';
+      case 'settings':
+        return 'linear-gradient(90deg, #1a2a3a, #2a3a4a, #1a2a2a)';
+      case 'discussions':
+        return 'linear-gradient(90deg, #3a2a4a, #4a3a5a, #2a1a3a)';
+      case 'projects':
+        return 'linear-gradient(90deg, #2a3a1a, #3a4a2a, #1a2a1a)';
+      case 'explore':
+        return 'linear-gradient(90deg, #1a3a4a, #2a4a5a, #1a2a3a)';
+      case 'saved':
+        return 'linear-gradient(90deg, #3a3a1a, #4a4a2a, #2a2a1a)';
+      default:
+        return 'linear-gradient(90deg, #0f0c29, #1a1060, #24243e)';
+    }
+  };
+
+  // Scroll progress tracking
+  useEffect(() => {
+    const handleScroll = () => {
+      const main = scrollRef.current;
+      if (main) {
+        const { scrollTop, scrollHeight, clientHeight } = main;
+        const progress = scrollHeight > clientHeight
+          ? (scrollTop / (scrollHeight - clientHeight)) * 100
+          : 0;
+        setScrollProgress(progress);
+      }
+    };
+
+    const mainElement = scrollRef.current;
+    if (mainElement) {
+      mainElement.addEventListener('scroll', handleScroll);
+    }
+
+    return () => {
+      if (mainElement) {
+        mainElement.removeEventListener('scroll', handleScroll);
+      }
+    };
+  }, []);
 
   React.useEffect(() => {
     if (currentUser && currentUser.username?.startsWith('user_')) {
@@ -106,14 +178,17 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
                 href={href}
                 onClick={() => setSidebarOpen(false)}
                 className={cn(
-                  'flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-all',
+                  'flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-all duration-150',
                   active ? 'text-white' : 'text-purple-200 hover:text-white hover:bg-white/10',
                 )}
                 style={active ? {
                   background: '#3d2b8e',
                   borderRadius: '8px',
                   paddingLeft: '12px',
+                  transform: 'translateX(2px)',
                 } : {}}
+                onMouseEnter={(e) => { if (!active) (e.currentTarget as HTMLAnchorElement).style.transform = 'translateX(3px)'; }}
+                onMouseLeave={(e) => { if (!active) (e.currentTarget as HTMLAnchorElement).style.transform = 'translateX(0)'; }}
               >
                 <div className="relative flex-shrink-0">
                   <Icon className={cn('w-5 h-5', active ? 'text-indigo-300' : 'text-purple-300')} />
@@ -174,11 +249,24 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
       {/* ── Main ── */}
       <div className="flex-1 flex flex-col min-h-screen lg:ml-[240px]">
 
+        {/* Scroll progress indicator */}
+        {scrollProgress > 0 && (
+          <div
+            className="hidden lg:block fixed top-0 left-[240px] right-0 h-0.5 z-50"
+            style={{ backgroundColor: 'rgba(79,70,229,0.5)' }}
+          >
+            <div
+              className="h-full transition-all duration-100 ease-out"
+              style={{ width: `${scrollProgress}%`, background: 'linear-gradient(90deg, #4f46e5, #7c3aed)' }}
+            />
+          </div>
+        )}
+
         {/* Mobile top bar */}
         <header
           className="lg:hidden flex items-center justify-between px-4 py-3 sticky top-0 z-20 flex-shrink-0"
           style={{
-            background: 'linear-gradient(90deg, #0f0c29, #1a1060, #24243e)',
+            background: getHeaderGradient(),
             borderBottom: '1px solid rgba(139,92,246,0.25)',
           }}
         >
@@ -211,7 +299,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
         </header>
 
         {/* Page content */}
-        <main className="flex-1 pb-20 lg:pb-0" style={{ backgroundColor: theme === 'light' ? '#f0eeff' : '#0d0d12' }}>
+        <main ref={scrollRef} className="flex-1 pb-20 lg:pb-0" style={{ backgroundColor: theme === 'light' ? '#f0eeff' : '#0d0d12' }}>
           {children}
         </main>
       </div>
@@ -231,8 +319,8 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
             <Link
               key={href}
               href={href}
-              className="flex flex-col items-center gap-0.5 px-3 py-1.5 rounded-lg transition-colors"
-              style={{ color: active ? '#c4b5fd' : '#a78bfa' }}
+              className="flex flex-col items-center gap-0.5 px-3 py-1.5 rounded-lg transition-all duration-150"
+              style={{ color: active ? '#c4b5fd' : '#a78bfa', transform: active ? 'translateY(-2px)' : 'translateY(0)', backgroundColor: active ? 'rgba(139,92,246,0.15)' : 'transparent' }}
             >
               <div className="relative">
                 <Icon className="w-5 h-5" />

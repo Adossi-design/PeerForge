@@ -94,10 +94,14 @@ export default function HomePage() {
       {/* Right Sidebar */}
       <aside
         className="hidden xl:flex flex-col flex-shrink-0 py-8 px-4 gap-4"
-        style={{ width: '300px', borderLeft: `1px solid ${rsBorder}`, backgroundColor: rsBg }}
+        style={{ width: '300px', borderLeft: `1px solid ${rsBorder}`, backgroundColor: rsBg, position: 'sticky', top: 0, height: '100vh', overflowY: 'auto' }}
       >
         {/* Trending Projects */}
-        <div className="card rounded-2xl p-4" style={{ backgroundColor: cardBg, border: `1px solid ${cardBdr}` }}>
+        <div className="card rounded-2xl p-4" style={{
+          backgroundColor: isLight ? '#f0ebff' : '#1a1535',
+          border: isLight ? '1px solid #ddd6fe' : '1px solid #2d2060',
+          background: isLight ? 'linear-gradient(135deg, #f0ebff 0%, #fce7f3 100%)' : 'linear-gradient(135deg, #1a1535 0%, #1e1040 100%)'
+        }}>
           <h3 className="flex items-center gap-2 text-sm font-bold mb-4" style={{ color: headClr }}>
             <TrendingUp className="w-4 h-4" style={{ color: iconClr }} />
             Trending Projects
@@ -116,7 +120,11 @@ export default function HomePage() {
         </div>
 
         {/* Active Discussions */}
-        <div className="card rounded-2xl p-4" style={{ backgroundColor: cardBg, border: `1px solid ${cardBdr}` }}>
+        <div className="card rounded-2xl p-4" style={{
+          backgroundColor: isLight ? '#eff6ff' : '#0f1f3d',
+          border: isLight ? '1px solid #bfdbfe' : '1px solid #1e3a6e',
+          background: isLight ? 'linear-gradient(135deg, #eff6ff 0%, #f0ebff 100%)' : 'linear-gradient(135deg, #0f1f3d 0%, #1a1535 100%)'
+        }}>
           <h3 className="flex items-center gap-2 text-sm font-bold mb-4" style={{ color: headClr }}>
             <MessageSquare className="w-4 h-4" style={{ color: iconClr }} />
             Active Discussions
@@ -135,7 +143,11 @@ export default function HomePage() {
         </div>
 
         {/* Hot Skills */}
-        <div className="card rounded-2xl p-4" style={{ backgroundColor: cardBg, border: `1px solid ${cardBdr}` }}>
+        <div className="card rounded-2xl p-4" style={{
+          backgroundColor: isLight ? '#fdf4ff' : '#1f0f35',
+          border: isLight ? '1px solid #e9d5ff' : '1px solid #3b1f6e',
+          background: isLight ? 'linear-gradient(135deg, #fdf4ff 0%, #fce7f3 100%)' : 'linear-gradient(135deg, #1f0f35 0%, #2d1060 100%)'
+        }}>
           <h3 className="flex items-center gap-2 text-sm font-bold mb-4" style={{ color: headClr }}>
             <Flame className="w-4 h-4" style={{ color: '#f97316' }} />
             Hot Skills

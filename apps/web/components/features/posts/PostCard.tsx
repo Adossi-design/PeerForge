@@ -39,7 +39,7 @@ export function Avatar({ name, avatarUrl, userId, size = 'sm', onClick }: {
   return (
     <div
       className={`${dim} rounded-full flex items-center justify-center font-semibold text-white overflow-hidden flex-shrink-0 ${userId ? 'cursor-pointer hover:opacity-80 transition-opacity' : ''}`}
-      style={{ backgroundColor: '#2a2a2a' }}
+      style={{ backgroundColor: avatarUrl ? '#2a2a2a' : '#4f46e5' }}
       onClick={onClick}
     >
       {content}

@@ -17,6 +17,6 @@ start "PeerForge Web" cmd /k "cd /d C:\Users\USER\USER\PeerForge\apps\web && npm
 echo.
 echo Done! 
 echo Web:   http://localhost:3000
-echo Admin: http://localhost:3000/login  ^(admin01test@gmail.com / Admin01@?^)
+echo Admin: http://localhost:3000/admin/login  ^(admin01test@gmail.com / Admin01@?^)
 echo.
 pause

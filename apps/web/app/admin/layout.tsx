@@ -32,7 +32,7 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
     setMounted(true);
     if (pathname === '/admin/login') return;
     const token = getAdminToken();
-    if (!token) router.replace('/login');
+    if (!token) router.replace('/admin/login');
   }, [pathname, router]);
 
   if (!mounted) return null;
@@ -90,14 +90,17 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
                 href={href}
                 onClick={() => setSidebarOpen(false)}
                 className={cn(
-                  'flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-all',
+                  'flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-all duration-150',
                   active ? 'text-white' : 'text-purple-200 hover:text-white hover:bg-white/10',
                 )}
                 style={active ? {
                   background: '#3d2b8e',
                   borderRadius: '8px',
                   paddingLeft: '12px',
+                  transform: 'translateX(2px)',
                 } : {}}
+                onMouseEnter={(e) => { if (!active) (e.currentTarget as HTMLAnchorElement).style.transform = 'translateX(3px)'; }}
+                onMouseLeave={(e) => { if (!active) (e.currentTarget as HTMLAnchorElement).style.transform = 'translateX(0)'; }}
               >
                 <div className="relative flex-shrink-0">
                   <Icon className={cn('w-4 h-4', active ? 'text-pink-300' : 'text-purple-300')} />

@@ -103,7 +103,11 @@
 [data-theme="light"] body,
 [data-theme="light"] main { background-color: #f0eeff !important; color: #12082a !important; }
 
-/* ─ Left sidebar — dark navy in light mode, black in dark mode ─ */
+/* ─ Left sidebar toggle pill — always visible regardless of theme ─ */
+[data-theme="light"] aside.fixed div[style*="backgroundColor: #4f46e5"],
+[data-theme="light"] aside.fixed div[style*="background-color: #4f46e5"] { background-color: #4f46e5 !important; }
+[data-theme="light"] aside.fixed span[style*="backgroundColor: #ffffff"],
+[data-theme="light"] aside.fixed span[style*="background-color: #ffffff"] { background-color: #ffffff !important; color: transparent !important; }
 [data-theme="light"] aside.fixed { background: #1a1a2e !important; border-color: #16213e !important; }
 [data-theme="light"] aside.fixed *,
 [data-theme="light"] aside.fixed a,
@@ -233,8 +237,12 @@
   border-color: #a5b4fc !important;
 }
 
-/* ─ Skeletons ─ */
-[data-theme="light"] .animate-pulse { background-color: #e9e4ff !important; }
+/* ─ Recharts tooltip & legend in light mode ─ */
+[data-theme="light"] .recharts-tooltip-wrapper .recharts-default-tooltip { background-color: #ffffff !important; border-color: #e5e7eb !important; color: #111827 !important; }
+[data-theme="light"] .recharts-tooltip-item { color: #111827 !important; }
+[data-theme="light"] .recharts-legend-item-text { color: #374151 !important; }
+[data-theme="light"] .recharts-cartesian-axis-tick-value { fill: #6b7280 !important; }
+[data-theme="light"] .recharts-pie-label-text { fill: #111827 !important; }
 
 html {
   scroll-behavior: smooth;

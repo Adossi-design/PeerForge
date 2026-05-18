@@ -266,8 +266,10 @@ export default function PostsPage() {
                   rows={4}
                   className="mt-1 block w-full rounded-md border border-slate-300 px-3 py-2 shadow-sm focus:border-blue-500 focus:outline-none"
                   placeholder="Describe your project..."
+                />
+              </div>
 
-                              <div>
+              <div>
                                 <label className="block text-sm font-medium text-slate-700">
                                   Attachments (Optional)
                                 </label>
@@ -312,8 +314,6 @@ export default function PostsPage() {
                                   </div>
                                 </div>
                               )}
-                />
-              </div>
 
               <div className="flex gap-3 pt-4">
                 <button

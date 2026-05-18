@@ -70,7 +70,7 @@ export default function PostDetailPage() {
   const fileAttachments = attachments.filter((a: any) => !isImage(a));
 
   return (
-    <div className="px-4 sm:px-8 py-8 w-full" style={{ maxWidth: '800px' }}>
+    <div className="px-4 sm:px-8 py-8 w-full mx-auto" style={{ maxWidth: '860px' }}>
       <button onClick={() => router.back()}
         className="flex items-center gap-2 text-sm mb-6 transition-colors hover:text-white"
         style={{ color: '#6b7280' }}>
@@ -226,7 +226,7 @@ export default function PostDetailPage() {
 
         <form onSubmit={handleComment} className="flex gap-3 mb-6">
           <div className="w-8 h-8 rounded-full flex items-center justify-center text-xs font-semibold flex-shrink-0 text-white"
-            style={{ backgroundColor: '#2a2a2a' }}>
+            style={{ backgroundColor: '#4f46e5' }}>
             {user?.firstName?.charAt(0).toUpperCase() ?? 'U'}
           </div>
           <div className="flex-1 relative">
