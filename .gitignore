@@ -1,20 +1,59 @@
+# Dependencies
 node_modules/
+
+# Build output
 .next/
 dist/
 build/
+*.tsbuildinfo
+
+# Environment
 .env
 .env.local
 .env.*.local
-.DS_Store
-*.log
-npm-debug.log*
-yarn-debug.log*
-yarn-error.log*
+
+# Editor / IDE
 .idea/
 .vscode/
 *.swp
 *.swo
 *~
+
+# Tooling caches
 .turbo/
 coverage/
 .nyc_output/
+
+# Logs
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Runtime data — local SQLite dev database and user uploads
+apps/api/prisma/dev.db
+apps/api/prisma/dev.db-journal
+apps/api/uploads/
+
+# Assistant / agent workspaces — keep the repo tool-agnostic
+.claude/
+.cursor/
+.kiro/
+.gemini/
+.copilot/
+.cline/
+.roo/
+.windsurf/
+.continue/
+.ai/
+prompts/
+conversations/
+ai_logs/
+assistant_history/
+
+# Misc local sandboxes
+tools/claude-test/
