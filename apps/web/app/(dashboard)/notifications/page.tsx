@@ -3,7 +3,7 @@
 import React from 'react';
 import { Bell } from 'lucide-react';
 import { useRouter } from 'next/navigation';
-import { useNotifications, useMarkAllRead } from '@/lib/hooks/useApi';
+import { useNotifications, useMarkAllRead, useMarkNotificationRead } from '@/lib/hooks/useApi';
 
 const TYPE_ICONS: Record<string, string> = {
   COMMENT: '💬', LIKE: '❤️', COLLABORATION_REQUEST: '👥',
@@ -13,6 +13,7 @@ const TYPE_ICONS: Record<string, string> = {
 export default function NotificationsPage() {
   const { data: notifications, isLoading } = useNotifications();
   const markAll = useMarkAllRead();
+  const markRead = useMarkNotificationRead();
   const router = useRouter();
 
   const unread = (notifications ?? []).filter((n) => !n.read).length;
@@ -70,7 +71,10 @@ export default function NotificationsPage() {
           {notifications.map((n) => (
             <div
               key={n.id}
-              onClick={() => n.link && router.push(n.link)}
+              onClick={() => {
+                if (!n.read) markRead.mutate(n.id);
+                if (n.link) router.push(n.link);
+              }}
               className="card flex items-start gap-4 p-4 rounded-xl transition-colors"
               style={{
                 backgroundColor: n.read ? '#1a1a1a' : '#1a2a3a',
@@ -86,8 +90,8 @@ export default function NotificationsPage() {
               </div>
               <div className="flex-1 min-w-0">
                 <p className="text-sm font-medium text-white">{n.title}</p>
-                {n.description && (
-                  <p className="text-xs mt-0.5" style={{ color: '#9ca3af' }}>{n.description}</p>
+                {n.message && (
+                  <p className="text-xs mt-0.5" style={{ color: '#9ca3af' }}>{n.message}</p>
                 )}
                 <p className="text-xs mt-1" style={{ color: '#6b7280' }}>
                   {new Date(n.createdAt).toLocaleDateString('en-US', {
