@@ -31,19 +31,13 @@ export default function ProfilePage() {
         <div style={{ height: '120px', background: 'linear-gradient(135deg, #3b1f6e 0%, #1a2a5e 50%, #0f3d3d 100%)' }} />
 
         <div className="px-6 pb-6 relative" style={{ marginTop: '-50px' }}>
-          {/* Avatar + Name + Edit button */}
-          <div className="flex items-end justify-between mb-4">
-            <div className="flex items-end gap-4">
-              <div className="w-20 h-20 rounded-full flex items-center justify-center font-bold text-white overflow-hidden flex-shrink-0"
-                style={{ backgroundColor: '#2a2a2a', border: '4px solid #1a1a1a', fontSize: '18px' }}>
-                {user?.avatarUrl
-                  ? <img src={user.avatarUrl} alt="avatar" className="w-full h-full object-cover" />
-                  : initials}
-              </div>
-              <div className="pb-1 relative z-10" style={{ textShadow: '0 1px 4px rgba(0,0,0,0.8)' }}>
-                <h2 className="text-lg font-bold text-white">{user?.fullName ?? 'Your Name'}</h2>
-                <p className="text-sm text-white/70">@{user?.username ?? 'username'}</p>
-              </div>
+          {/* Avatar (overlaps banner edge) + Edit button on the right */}
+          <div className="flex items-end justify-between mb-3">
+            <div className="w-20 h-20 rounded-full flex items-center justify-center font-bold text-white overflow-hidden flex-shrink-0"
+              style={{ backgroundColor: '#2a2a2a', border: '4px solid var(--post-body-bg, #1a1a1a)', fontSize: '18px' }}>
+              {user?.avatarUrl
+                ? <img src={user.avatarUrl} alt="avatar" className="w-full h-full object-cover" />
+                : initials}
             </div>
             <Link href="/settings">
               <button className="text-sm font-medium px-4 py-1.5 rounded-lg mb-1 transition-colors"
@@ -51,6 +45,13 @@ export default function ProfilePage() {
                 Edit Profile
               </button>
             </Link>
+          </div>
+
+          {/* Name + username — placed BELOW the banner on the card body so
+              it's always readable in both light and dark mode. */}
+          <div className="mb-4">
+            <h2 className="text-xl font-bold text-white">{user?.fullName ?? 'Your Name'}</h2>
+            <p className="text-sm mt-0.5" style={{ color: '#9ca3af' }}>@{user?.username ?? 'username'}</p>
           </div>
 
           {/* Bio */}
@@ -84,7 +85,7 @@ export default function ProfilePage() {
             <span className="flex items-center gap-1">
               <Calendar className="w-3.5 h-3.5" />
               Joined {user?.createdAt
-                ? new Date(user.createdAt as any).toLocaleDateString('en-US', { month: 'long', year: 'numeric' })
+                ? new Date(user.createdAt).toLocaleDateString('en-US', { month: 'long', year: 'numeric' })
                 : new Date().toLocaleDateString('en-US', { month: 'long', year: 'numeric' })}
             </span>
           </div>
@@ -95,7 +96,7 @@ export default function ProfilePage() {
               { label: 'Posts', value: user?._count?.posts ?? myPosts?.length ?? 0 },
               { label: 'Followers', value: followCounts?.followers ?? 0 },
               { label: 'Following', value: followCounts?.following ?? 0 },
-              { label: 'Rep', value: user?.reputation ?? 0, accent: true },
+              { label: 'Reputation', value: user?.reputation ?? 0, accent: true },
             ].map(({ label, value, accent }) => (
               <div key={label}>
                 <span className="font-bold text-base" style={{ color: accent ? '#a78bfa' : '#ffffff' }}>{value}</span>
