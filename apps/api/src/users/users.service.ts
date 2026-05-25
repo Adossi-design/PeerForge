@@ -47,10 +47,10 @@ export class UsersService {
     return this.formatUser(user);
   }
 
-  async updateProfile(userId: string, data: UpdateUserProfileDto) {
-    const { skills, interests, ...rest } = data as any;
+  async updateProfile(userId: string, data: UpdateUserProfileDto & { skills?: string[]; interests?: string[] }) {
+    const { skills, interests, ...rest } = data;
 
-    const updateData: any = { ...rest };
+    const updateData: Record<string, unknown> = { ...rest };
     if (interests !== undefined) updateData.interests = JSON.stringify(interests);
     if (skills !== undefined) updateData.skillsJson = JSON.stringify(skills);
 
@@ -92,7 +92,7 @@ export class UsersService {
     });
   }
 
-  private formatUser(user: any): UserResponseDto {
+  private formatUser(user: any) {
     // Skills: prefer skillsJson (plain string array) over UserSkill relations
     let skillNames: string[] = [];
     if (user.skillsJson) {
@@ -124,6 +124,6 @@ export class UsersService {
       isVerified: user.isVerified,
       createdAt: user.createdAt,
       _count: user._count,
-    } as any;
+    };
   }
 }

@@ -11,6 +11,7 @@ import {
 } from '@nestjs/common';
 import { UsersService } from './users.service';
 import { UpdateUserProfileDto, AddSkillDto } from './dto/user.dto';
+import { clampInt } from '@/common/pagination';
 
 @Controller('users')
 export class UsersController {
@@ -63,7 +64,7 @@ export class UsersController {
     @Param('query') query: string,
     @Query('limit') limit: string = '20',
   ) {
-    const users = await this.usersService.searchUsers(query, parseInt(limit));
+    const users = await this.usersService.searchUsers(query, clampInt(limit, 20, 50));
     return { users };
   }
 }

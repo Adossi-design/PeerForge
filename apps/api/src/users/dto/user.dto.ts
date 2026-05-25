@@ -1,4 +1,5 @@
 import { IsOptional, MinLength, MaxLength, IsArray } from 'class-validator';
+import { ProficiencyLevel } from '@/types';
 
 export class UpdateUserProfileDto {
   @IsOptional()
@@ -44,7 +45,7 @@ export class UpdateUserProfileDto {
 
 export class AddSkillDto {
   skillId!: string;
-  proficiencyLevel!: 'BEGINNER' | 'INTERMEDIATE' | 'ADVANCED' | 'EXPERT';
+  proficiencyLevel!: ProficiencyLevel;
 }
 
 export class UserResponseDto {
