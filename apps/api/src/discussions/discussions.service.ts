@@ -59,13 +59,17 @@ export class DiscussionsService {
   }
 
   async leaveDiscussion(discussionId: string, userId: string) {
-    await this.prisma.discussionMember.delete({
-      where: { discussionId_userId: { discussionId, userId } },
-    }).catch(() => {});
-    await this.prisma.discussion.update({
-      where: { id: discussionId },
-      data: { memberCount: { decrement: 1 } },
-    });
+    // delete may fail if user isn't a member; that's an acceptable no-op
+    const deleted = await this.prisma.discussionMember
+      .delete({ where: { discussionId_userId: { discussionId, userId } } })
+      .then(() => true)
+      .catch(() => false);
+    if (deleted) {
+      await this.prisma.discussion.update({
+        where: { id: discussionId },
+        data: { memberCount: { decrement: 1 } },
+      });
+    }
     return { success: true };
   }
 

@@ -6,8 +6,9 @@ import {
 import { Server, Socket } from 'socket.io';
 import { DiscussionsService } from './discussions.service';
 import { SendMessageDto } from './dto/message.dto';
-import { Injectable } from '@nestjs/common';
+import { Injectable, Logger } from '@nestjs/common';
 import { PrismaService } from '@/database/prisma.service';
+import { authenticateSocket, getSocketUserId } from '@/common/socket-auth.helper';
 
 @WebSocketGateway({
   namespace: '/discussions',
@@ -19,6 +20,7 @@ import { PrismaService } from '@/database/prisma.service';
 @Injectable()
 export class DiscussionsGateway implements OnGatewayConnection, OnGatewayDisconnect {
   @WebSocketServer() server!: Server;
+  private readonly logger = new Logger(DiscussionsGateway.name);
   private userSocketMap = new Map<string, Set<string>>();
 
   constructor(
@@ -26,75 +28,70 @@ export class DiscussionsGateway implements OnGatewayConnection, OnGatewayDisconn
     private prisma: PrismaService,
   ) {}
 
-  // Resolve Clerk ID or DB ID to actual DB user ID
-  private async resolveUserId(id: string): Promise<string | null> {
-    if (!id) return null;
-    // Try direct DB id first
-    let user = await this.prisma.user.findUnique({ where: { id } });
-    if (user) return user.id;
-    // Try Clerk id
-    user = await this.prisma.user.findUnique({ where: { clerkId: id } });
-    return user?.id ?? null;
-  }
-
-  handleConnection(client: Socket) {
-    console.log(`Socket connected: ${client.id}`);
+  async handleConnection(client: Socket) {
+    const userId = await authenticateSocket(this.prisma, client);
+    if (!userId) {
+      client.emit('error', { message: 'Unauthorized' });
+      client.disconnect(true);
+      return;
+    }
+    if (!this.userSocketMap.has(userId)) this.userSocketMap.set(userId, new Set());
+    this.userSocketMap.get(userId)!.add(client.id);
+    this.logger.debug(`socket connected: ${client.id} (user ${userId})`);
   }
 
   handleDisconnect(client: Socket) {
-    for (const [userId, socketIds] of this.userSocketMap.entries()) {
-      if (socketIds.has(client.id)) {
-        socketIds.delete(client.id);
-        if (socketIds.size === 0) this.userSocketMap.delete(userId);
-      }
+    const userId = getSocketUserId(client);
+    if (!userId) return;
+    const set = this.userSocketMap.get(userId);
+    if (set) {
+      set.delete(client.id);
+      if (set.size === 0) this.userSocketMap.delete(userId);
     }
   }
 
   @SubscribeMessage('join_discussion')
   async handleJoinDiscussion(
     @ConnectedSocket() client: Socket,
-    @MessageBody() data: { discussionId: string; userId: string },
+    @MessageBody() data: { discussionId: string },
   ) {
-    const dbUserId = await this.resolveUserId(data.userId);
-    if (!dbUserId) return { success: false, error: 'User not found' };
-
-    if (!this.userSocketMap.has(dbUserId)) this.userSocketMap.set(dbUserId, new Set());
-    this.userSocketMap.get(dbUserId)!.add(client.id);
+    const userId = getSocketUserId(client);
+    if (!userId) return { success: false, error: 'Unauthorized' };
 
     client.join(`discussion_${data.discussionId}`);
-    await this.discussionsService.joinDiscussion(data.discussionId, dbUserId);
-    this.server.to(`discussion_${data.discussionId}`).emit('user_joined', { userId: dbUserId, timestamp: new Date() });
+    await this.discussionsService.joinDiscussion(data.discussionId, userId);
+    this.server.to(`discussion_${data.discussionId}`).emit('user_joined', { userId, timestamp: new Date() });
     return { success: true };
   }
 
   @SubscribeMessage('leave_discussion')
   async handleLeaveDiscussion(
     @ConnectedSocket() client: Socket,
-    @MessageBody() data: { discussionId: string; userId: string },
+    @MessageBody() data: { discussionId: string },
   ) {
-    const dbUserId = await this.resolveUserId(data.userId);
-    if (!dbUserId) return { success: false };
+    const userId = getSocketUserId(client);
+    if (!userId) return { success: false };
 
     client.leave(`discussion_${data.discussionId}`);
-    await this.discussionsService.leaveDiscussion(data.discussionId, dbUserId);
-    this.server.to(`discussion_${data.discussionId}`).emit('user_left', { userId: dbUserId, timestamp: new Date() });
+    await this.discussionsService.leaveDiscussion(data.discussionId, userId);
+    this.server.to(`discussion_${data.discussionId}`).emit('user_left', { userId, timestamp: new Date() });
     return { success: true };
   }
 
   @SubscribeMessage('send_message')
   async handleSendMessage(
     @ConnectedSocket() client: Socket,
-    @MessageBody() data: { discussionId: string; userId: string; message: SendMessageDto },
+    @MessageBody() data: { discussionId: string; message: SendMessageDto },
   ) {
     try {
-      const dbUserId = await this.resolveUserId(data.userId);
-      if (!dbUserId) throw new Error('User not found');
+      const userId = getSocketUserId(client);
+      if (!userId) throw new Error('Unauthorized');
 
       // Auto-join if not already a member
-      await this.discussionsService.joinDiscussion(data.discussionId, dbUserId);
+      await this.discussionsService.joinDiscussion(data.discussionId, userId);
       client.join(`discussion_${data.discussionId}`);
 
-      const saved = await this.discussionsService.sendMessage(data.discussionId, dbUserId, data.message);
+      const saved = await this.discussionsService.sendMessage(data.discussionId, userId, data.message);
 
       this.server.to(`discussion_${data.discussionId}`).emit('message_received', {
         id: saved.id,
@@ -115,12 +112,13 @@ export class DiscussionsGateway implements OnGatewayConnection, OnGatewayDisconn
   @SubscribeMessage('delete_message')
   async handleDeleteMessage(
     @ConnectedSocket() client: Socket,
-    @MessageBody() data: { discussionId: string; messageId: string; userId: string },
+    @MessageBody() data: { discussionId: string; messageId: string },
   ) {
     try {
-      const dbUserId = await this.resolveUserId(data.userId);
-      if (!dbUserId) throw new Error('User not found');
-      await this.discussionsService.deleteMessage(data.messageId, dbUserId);
+      const userId = getSocketUserId(client);
+      if (!userId) throw new Error('Unauthorized');
+      // Ownership check is enforced inside discussionsService.deleteMessage
+      await this.discussionsService.deleteMessage(data.messageId, userId);
       this.server.to(`discussion_${data.discussionId}`).emit('message_deleted', { messageId: data.messageId });
       return { success: true };
     } catch (error: any) {
@@ -132,12 +130,14 @@ export class DiscussionsGateway implements OnGatewayConnection, OnGatewayDisconn
   @SubscribeMessage('react_message')
   async handleReactMessage(
     @ConnectedSocket() client: Socket,
-    @MessageBody() data: { discussionId: string; messageId: string; emoji: string; userId: string },
+    @MessageBody() data: { discussionId: string; messageId: string; emoji: string },
   ) {
     try {
-      await this.discussionsService.addReaction(data.messageId, data.emoji, data.userId);
+      const userId = getSocketUserId(client);
+      if (!userId) throw new Error('Unauthorized');
+      await this.discussionsService.addReaction(data.messageId, data.emoji, userId);
       this.server.to(`discussion_${data.discussionId}`).emit('message_reacted', {
-        messageId: data.messageId, emoji: data.emoji, userId: data.userId,
+        messageId: data.messageId, emoji: data.emoji, userId,
       });
       return { success: true };
     } catch (error: any) {
@@ -147,12 +147,16 @@ export class DiscussionsGateway implements OnGatewayConnection, OnGatewayDisconn
   }
 
   @SubscribeMessage('user_typing')
-  handleUserTyping(@ConnectedSocket() client: Socket, @MessageBody() data: { discussionId: string; userId: string; username: string }) {
-    this.server.to(`discussion_${data.discussionId}`).emit('user_typing', { userId: data.userId, username: data.username });
+  handleUserTyping(@ConnectedSocket() client: Socket, @MessageBody() data: { discussionId: string; username: string }) {
+    const userId = getSocketUserId(client);
+    if (!userId) return;
+    this.server.to(`discussion_${data.discussionId}`).emit('user_typing', { userId, username: data.username });
   }
 
   @SubscribeMessage('user_stop_typing')
-  handleUserStopTyping(@ConnectedSocket() client: Socket, @MessageBody() data: { discussionId: string; userId: string }) {
-    this.server.to(`discussion_${data.discussionId}`).emit('user_stop_typing', { userId: data.userId });
+  handleUserStopTyping(@ConnectedSocket() client: Socket, @MessageBody() data: { discussionId: string }) {
+    const userId = getSocketUserId(client);
+    if (!userId) return;
+    this.server.to(`discussion_${data.discussionId}`).emit('user_stop_typing', { userId });
   }
 }

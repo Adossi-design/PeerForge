@@ -1,7 +1,9 @@
 import {
-  Controller, Get, Post, Delete, Param, Query, Req, BadRequestException,
+  Controller, Get, Post, Delete, Param, Query, Req, UnauthorizedException,
 } from '@nestjs/common';
 import { DiscussionsService } from './discussions.service';
+import { clampInt, SKIP_DEFAULT, SKIP_MAX, TAKE_DEFAULT, TAKE_MAX } from '@/common/pagination';
+import { AuthenticatedRequest } from '@/common/auth-request';
 
 @Controller('discussions')
 export class DiscussionsController {
@@ -13,7 +15,8 @@ export class DiscussionsController {
     @Query('take') take = '20',
   ) {
     const discussions = await this.discussionsService.getAllDiscussions(
-      parseInt(skip), parseInt(take),
+      clampInt(skip, SKIP_DEFAULT, SKIP_MAX),
+      clampInt(take, TAKE_DEFAULT, TAKE_MAX),
     );
     return { discussions };
   }
@@ -37,23 +40,25 @@ export class DiscussionsController {
     @Query('take') take = '50',
   ) {
     const messages = await this.discussionsService.getDiscussionMessages(
-      discussionId, parseInt(skip), parseInt(take),
+      discussionId,
+      clampInt(skip, SKIP_DEFAULT, SKIP_MAX),
+      clampInt(take, TAKE_DEFAULT, TAKE_MAX),
     );
     return { messages };
   }
 
   @Post(':id/join')
-  async joinDiscussion(@Param('id') discussionId: string, @Req() req: any) {
+  async joinDiscussion(@Param('id') discussionId: string, @Req() req: AuthenticatedRequest) {
     const userId = req.user?.id;
-    if (!userId) throw new BadRequestException('User not authenticated');
+    if (!userId) throw new UnauthorizedException('User not authenticated');
     const member = await this.discussionsService.joinDiscussion(discussionId, userId);
     return { member };
   }
 
   @Delete(':id/leave')
-  async leaveDiscussion(@Param('id') discussionId: string, @Req() req: any) {
+  async leaveDiscussion(@Param('id') discussionId: string, @Req() req: AuthenticatedRequest) {
     const userId = req.user?.id;
-    if (!userId) throw new BadRequestException('User not authenticated');
+    if (!userId) throw new UnauthorizedException('User not authenticated');
     await this.discussionsService.leaveDiscussion(discussionId, userId);
     return { success: true };
   }
