@@ -1,11 +1,12 @@
 import {
   Controller, Post, UseInterceptors, UploadedFiles,
-  BadRequestException,
+  BadRequestException, UnauthorizedException, Req,
 } from '@nestjs/common';
 import { FilesInterceptor } from '@nestjs/platform-express';
 import { diskStorage } from 'multer';
 import { extname, join } from 'path';
 import { existsSync, mkdirSync } from 'fs';
+import { AuthenticatedRequest } from '@/common/auth-request';
 
 const uploadDir = join(process.cwd(), 'uploads');
 if (!existsSync(uploadDir)) mkdirSync(uploadDir, { recursive: true });
@@ -29,9 +30,14 @@ export class UploadsController {
       },
     }),
   )
-  uploadFiles(@UploadedFiles() files: Express.Multer.File[]) {
+  uploadFiles(@UploadedFiles() files: Express.Multer.File[], @Req() req: AuthenticatedRequest) {
+    if (!req.user?.id) throw new UnauthorizedException('User not authenticated');
     if (!files?.length) throw new BadRequestException('No files uploaded');
-    const base = `http://localhost:${process.env.PORT || 3001}`;
+    // Prefer an explicit PUBLIC_API_URL so generated URLs work in production.
+    // Fall back to the request's own host/proto for local dev.
+    const base =
+      process.env.PUBLIC_API_URL ||
+      `${req.protocol}://${req.get('host')}`;
     return {
       files: files.map((f) => ({
         name: f.originalname,
