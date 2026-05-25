@@ -1,8 +1,10 @@
 import { Controller, Post, Get, Put, Delete, Body, Param, Query, Req, UnauthorizedException, BadRequestException } from '@nestjs/common';
+import { Request } from 'express';
 import { AdminService } from './admin.service';
 import { ReportsService } from '@/reports/reports.service';
+import { ReportStatus } from '@/types';
 
-function extractAdminToken(req: any): string {
+function extractAdminToken(req: Request): string {
   const auth = req.headers['authorization'] ?? '';
   if (auth.startsWith('Bearer ')) return auth.slice(7);
   throw new UnauthorizedException('Admin token required');
@@ -22,7 +24,7 @@ export class AdminController {
   }
 
   @Get('stats')
-  getStats(@Req() req: any) {
+  getStats(@Req() req: Request) {
     const token = extractAdminToken(req);
     this.adminService.verifyToken(token);
     return this.adminService.getStats();
@@ -30,7 +32,7 @@ export class AdminController {
 
   @Get('users')
   getUsers(
-    @Req() req: any,
+    @Req() req: Request,
     @Query('skip') skip = '0',
     @Query('take') take = '20',
     @Query('search') search = '',
@@ -41,7 +43,7 @@ export class AdminController {
   }
 
   @Delete('users/:id')
-  deleteUser(@Req() req: any, @Param('id') id: string) {
+  deleteUser(@Req() req: Request, @Param('id') id: string) {
     const token = extractAdminToken(req);
     this.adminService.verifyToken(token);
     return this.adminService.deleteUser(id);
@@ -49,7 +51,7 @@ export class AdminController {
 
   @Get('posts')
   getPosts(
-    @Req() req: any,
+    @Req() req: Request,
     @Query('skip') skip = '0',
     @Query('take') take = '20',
     @Query('search') search = '',
@@ -60,7 +62,7 @@ export class AdminController {
   }
 
   @Delete('posts/:id')
-  deletePost(@Req() req: any, @Param('id') id: string) {
+  deletePost(@Req() req: Request, @Param('id') id: string) {
     const token = extractAdminToken(req);
     this.adminService.verifyToken(token);
     return this.adminService.deletePost(id);
@@ -68,18 +70,20 @@ export class AdminController {
 
   @Get('reports')
   getReports(
-    @Req() req: any,
+    @Req() req: Request,
     @Query('status') status?: string,
     @Query('skip') skip = '0',
     @Query('take') take = '50',
   ) {
     const token = extractAdminToken(req);
     this.adminService.verifyToken(token);
-    return this.reportsService.getReports(status, +skip, +take);
+    const allowed = Object.values(ReportStatus) as string[];
+    const filterStatus = status && allowed.includes(status) ? (status as ReportStatus) : undefined;
+    return this.reportsService.getReports(filterStatus, +skip, +take);
   }
 
   @Get('reports/count')
-  getReportCount(@Req() req: any) {
+  getReportCount(@Req() req: Request) {
     const token = extractAdminToken(req);
     this.adminService.verifyToken(token);
     return this.reportsService.getPendingCount();
@@ -87,9 +91,9 @@ export class AdminController {
 
   @Put('reports/:id')
   updateReport(
-    @Req() req: any,
+    @Req() req: Request,
     @Param('id') id: string,
-    @Body() body: { status: 'REVIEWED' | 'DISMISSED' },
+    @Body() body: { status: ReportStatus.REVIEWED | ReportStatus.DISMISSED },
   ) {
     const token = extractAdminToken(req);
     this.adminService.verifyToken(token);

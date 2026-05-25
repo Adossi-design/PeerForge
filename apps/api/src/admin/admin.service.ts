@@ -1,26 +1,45 @@
-import { Injectable, UnauthorizedException } from '@nestjs/common';
+import { Injectable, Logger, OnModuleInit, UnauthorizedException } from '@nestjs/common';
 import { PrismaService } from '@/database/prisma.service';
 import * as jwt from 'jsonwebtoken';
 
-const ADMIN_EMAIL = process.env.ADMIN_EMAIL || 'admin01test@gmail.com';
-const ADMIN_PASSWORD = process.env.ADMIN_PASSWORD || 'Admin01@?';
-const ADMIN_JWT_SECRET = process.env.ADMIN_JWT_SECRET || 'peerforge-admin-secret-2025';
-
 @Injectable()
-export class AdminService {
+export class AdminService implements OnModuleInit {
+  private readonly logger = new Logger(AdminService.name);
+
   constructor(private prisma: PrismaService) {}
 
+  onModuleInit() {
+    // ConfigModule has loaded env files by this point. Warn at startup if
+    // admin creds aren't configured.
+    if (!process.env.ADMIN_EMAIL || !process.env.ADMIN_PASSWORD || !process.env.ADMIN_JWT_SECRET) {
+      this.logger.warn(
+        'ADMIN_EMAIL, ADMIN_PASSWORD, and ADMIN_JWT_SECRET must all be set in the environment. Admin login is disabled until they are configured.',
+      );
+    }
+  }
+
   login(email: string, password: string) {
-    if (email !== ADMIN_EMAIL || password !== ADMIN_PASSWORD) {
+    const adminEmail = process.env.ADMIN_EMAIL;
+    const adminPassword = process.env.ADMIN_PASSWORD;
+    const adminJwtSecret = process.env.ADMIN_JWT_SECRET;
+
+    if (!adminEmail || !adminPassword || !adminJwtSecret) {
+      throw new UnauthorizedException('Admin login is not configured');
+    }
+    if (email !== adminEmail || password !== adminPassword) {
       throw new UnauthorizedException('Invalid admin credentials');
     }
-    const token = jwt.sign({ role: 'admin', email }, ADMIN_JWT_SECRET, { expiresIn: '24h' });
+    const token = jwt.sign({ role: 'admin', email }, adminJwtSecret, { expiresIn: '24h' });
     return { token, email };
   }
 
   verifyToken(token: string) {
+    const adminJwtSecret = process.env.ADMIN_JWT_SECRET;
+    if (!adminJwtSecret) {
+      throw new UnauthorizedException('Admin authentication is not configured');
+    }
     try {
-      return jwt.verify(token, ADMIN_JWT_SECRET) as { role: string; email: string };
+      return jwt.verify(token, adminJwtSecret) as { role: string; email: string };
     } catch {
       throw new UnauthorizedException('Invalid or expired admin token');
     }
