@@ -1,17 +1,32 @@
-import { Injectable, NotFoundException, ForbiddenException } from '@nestjs/common';
+import { Injectable, Logger, NotFoundException, ForbiddenException } from '@nestjs/common';
 import { PrismaService } from '@/database/prisma.service';
 import { CreatePostDto, UpdatePostDto } from './dto/post.dto';
-import { PostVisibility, NotificationType } from '@/types';
+import { PostVisibility, NotificationType, DiscussionType } from '@/types';
 import { NotificationsService } from '@/notifications/notifications.service';
 
 const POST_INCLUDE = {
   author: { select: { id: true, username: true, avatarUrl: true } },
   _count: { select: { comments: true, likes: true, savedBy: true } },
+  // Top 3 most recent likers — used by the feed UI to show a small avatar
+  // stack ("liked by X, Y and 12 others") without a second roundtrip.
+  likes: {
+    take: 3,
+    orderBy: { createdAt: 'desc' as const },
+    select: {
+      user: { select: { id: true, username: true, fullName: true, avatarUrl: true } },
+    },
+  },
 };
 
 function parseTags(post: any) {
+  // Flatten `likes: [{ user }]` → `topLikers: User[]` for the client.
+  const topLikers = Array.isArray(post.likes)
+    ? post.likes.map((l: any) => l.user).filter(Boolean)
+    : [];
+  const { likes: _rawLikes, ...rest } = post;
   return {
-    ...post,
+    ...rest,
+    topLikers,
     tags: post.tags
       ? typeof post.tags === 'string'
         ? (() => { try { return JSON.parse(post.tags); } catch { return []; } })()
@@ -25,6 +40,8 @@ function parseTags(post: any) {
 
 @Injectable()
 export class PostsService {
+  private readonly logger = new Logger(PostsService.name);
+
   constructor(
     private prisma: PrismaService,
     private notifications: NotificationsService,
@@ -46,7 +63,7 @@ export class PostsService {
         description: data.description,
         type: data.type,
         status: data.status || 'IDEATION',
-        visibility: data.visibility || 'PUBLIC',
+        visibility: data.visibility || PostVisibility.PUBLIC,
         tags: data.tags ? JSON.stringify(data.tags) : null,
         teamSize: data.teamSize,
         deadline: data.deadline ? new Date(data.deadline) : null,
@@ -60,12 +77,16 @@ export class PostsService {
 
     if (data.requiredSkillIds?.length) {
       for (const skillId of data.requiredSkillIds) {
-        await this.prisma.postSkill.create({ data: { postId: post.id, skillId } }).catch(() => {});
+        await this.prisma.postSkill.create({ data: { postId: post.id, skillId } }).catch((err) => {
+          // Duplicate (postId, skillId) is expected and safe to ignore; log anything else.
+          if (err?.code !== 'P2002') this.logger.warn(`postSkill create failed: ${err?.message}`);
+        });
       }
     }
 
     // +1 rep for posting
-    await this.prisma.user.update({ where: { id: user.id }, data: { reputation: { increment: 1 } } }).catch(() => {});
+    await this.prisma.user.update({ where: { id: user.id }, data: { reputation: { increment: 1 } } })
+      .catch((err) => this.logger.warn(`rep increment (post) failed for user ${user.id}: ${err?.message}`));
 
     // Create associated discussion room
     await this.prisma.discussion.create({
@@ -73,7 +94,7 @@ export class PostsService {
         postId: post.id,
         name: `${data.title}`,
         description: data.description,
-        type: 'PROJECT',
+        type: DiscussionType.PROJECT,
       },
     });
 
@@ -136,7 +157,7 @@ export class PostsService {
     const posts = await this.prisma.post.findMany({
       where: {
         AND: [
-          { visibility: 'PUBLIC' },
+          { visibility: PostVisibility.PUBLIC },
           { OR: [{ title: { contains: query } }, { description: { contains: query } }] },
         ],
       },
@@ -184,7 +205,8 @@ export class PostsService {
         `/posts/${postId}`,
       );
       // +2 rep for post author when liked
-      await this.prisma.user.update({ where: { id: post.authorId }, data: { reputation: { increment: 2 } } }).catch(() => {});
+      await this.prisma.user.update({ where: { id: post.authorId }, data: { reputation: { increment: 2 } } })
+        .catch((err) => this.logger.warn(`rep increment (like) failed for user ${post.authorId}: ${err?.message}`));
     }
     return { liked: true };
   }
@@ -192,21 +214,38 @@ export class PostsService {
   async savePost(postId: string, userId: string) {
     const existing = await this.prisma.savedPost.findUnique({
       where: { userId_postId: { userId, postId } },
-    }).catch(() => null);
+    });
 
     if (existing) {
-      await this.prisma.savedPost.delete({ where: { id: existing.id } }).catch(() => {});
+      await this.prisma.savedPost.delete({ where: { id: existing.id } });
       return { saved: false };
     }
 
-    await this.prisma.savedPost.create({ data: { userId, postId } }).catch(() => {});
+    await this.prisma.savedPost.create({ data: { userId, postId } });
     return { saved: true };
   }
 
   async sharePost(postId: string) {
-    await this.prisma.post.update({ where: { id: postId }, data: { shareCount: { increment: 1 } } }).catch(() => {});
-    const post = await this.prisma.post.findUnique({ where: { id: postId }, select: { shareCount: true } });
-    return { shareCount: post?.shareCount ?? 0 };
+    const post = await this.prisma.post.update({
+      where: { id: postId },
+      data: { shareCount: { increment: 1 } },
+      select: { shareCount: true },
+    });
+    return { shareCount: post.shareCount };
+  }
+
+  /** Users who liked a given post — newest first. */
+  async getPostLikers(postId: string, skip = 0, take = 50) {
+    const likes = await this.prisma.like.findMany({
+      where: { postId },
+      skip,
+      take,
+      orderBy: { createdAt: 'desc' },
+      include: {
+        user: { select: { id: true, username: true, fullName: true, avatarUrl: true } },
+      },
+    });
+    return likes.map((l) => l.user).filter(Boolean);
   }
 
   async getSavedPosts(userId: string) {
@@ -214,14 +253,11 @@ export class PostsService {
       where: { userId },
       include: {
         post: {
-          include: {
-            author: { select: { id: true, username: true, avatarUrl: true } },
-            _count: { select: { comments: true, likes: true, savedBy: true } },
-          },
+          include: POST_INCLUDE,
         },
       },
       orderBy: { createdAt: 'desc' },
-    }).catch(() => []);
+    });
     const posts = saved.map((s: any) => parseTags(s.post)).filter(Boolean);
     return this.attachUserState(posts, userId);
   }
