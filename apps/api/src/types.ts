@@ -33,3 +33,47 @@ export enum NotificationType {
   PROJECT_UPDATE = "PROJECT_UPDATE",
   SKILL_ENDORSED = "SKILL_ENDORSED",
 }
+
+export enum CollaborationStatus {
+  PENDING = "PENDING",
+  ACCEPTED = "ACCEPTED",
+  REJECTED = "REJECTED",
+  ACTIVE = "ACTIVE",
+  COMPLETED = "COMPLETED",
+}
+
+export enum MessageType {
+  TEXT = "TEXT",
+  CODE = "CODE",
+  ANNOUNCEMENT = "ANNOUNCEMENT",
+  SYSTEM = "SYSTEM",
+}
+
+export enum MemberRole {
+  OWNER = "OWNER",
+  MODERATOR = "MODERATOR",
+  MEMBER = "MEMBER",
+}
+
+export enum DiscussionType {
+  PROJECT = "PROJECT",
+}
+
+export enum ProficiencyLevel {
+  BEGINNER = "BEGINNER",
+  INTERMEDIATE = "INTERMEDIATE",
+  ADVANCED = "ADVANCED",
+  EXPERT = "EXPERT",
+}
+
+export enum ReportTargetType {
+  POST = "POST",
+  COMMENT = "COMMENT",
+  USER = "USER",
+}
+
+export enum ReportStatus {
+  PENDING = "PENDING",
+  REVIEWED = "REVIEWED",
+  DISMISSED = "DISMISSED",
+}
