@@ -46,25 +46,31 @@ export default function ConversationPage() {
     bottomRef.current?.scrollIntoView({ behavior: 'smooth' });
   }, [liveMessages]);
 
-  // Real-time socket
+  // Real-time socket — server authenticates via Clerk token at handshake
   useEffect(() => {
     if (!currentUser?.id) return;
-    const socket = getDmSocket();
-    socket.emit('dm_register', { userId: currentUser.id });
+    let cancelled = false;
 
     const onReceived = (msg: DirectMessage) => {
       if (msg.senderId === otherUserId || msg.receiverId === otherUserId) {
-        setLiveMessages((prev) => prev.find((m) => m.id === msg.id) ? prev : [...prev, msg]);
+        setLiveMessages((prev) => (prev.find((m) => m.id === msg.id) ? prev : [...prev, msg]));
       }
     };
-    const onSent = (msg: DirectMessage) => {
-      setLiveMessages((prev) => prev.find((m) => m.id === msg.id) ? prev : [...prev, msg]);
-    };
 
-    socket.on('dm_received', onReceived);
-    socket.on('dm_sent', onSent);
-    return () => { socket.off('dm_received', onReceived); socket.off('dm_sent', onSent); };
-  }, [currentUser?.id, otherUserId]);
+    let cleanup = () => {};
+    (async () => {
+      const token = await getToken();
+      if (cancelled) return;
+      const socket = getDmSocket(token);
+      socket.on('dm_received', onReceived);
+      cleanup = () => socket.off('dm_received', onReceived);
+    })();
+
+    return () => {
+      cancelled = true;
+      cleanup();
+    };
+  }, [currentUser?.id, otherUserId, getToken]);
 
   const handleSend = async () => {
     if (!text.trim()) return;
@@ -79,10 +85,10 @@ export default function ConversationPage() {
   const initials = displayName.slice(0, 2).toUpperCase();
 
   return (
-    <div className="flex flex-col" style={{ height: '100dvh', backgroundColor: '#0d0d0d' }}>
+    <div className="flex flex-col" style={{ height: '100dvh', backgroundColor: 'var(--chat-bg)' }}>
       {/* Header */}
       <div className="flex items-center gap-3 px-4 py-3 flex-shrink-0"
-        style={{ borderBottom: '1px solid #1f1f1f', backgroundColor: '#111111' }}>
+        style={{ borderBottom: '1px solid var(--chat-border)', backgroundColor: 'var(--chat-header-bg)' }}>
         <button onClick={() => router.back()} className="hover:text-white transition-colors" style={{ color: '#6b7280' }}>
           <ArrowLeft className="w-5 h-5" />
         </button>
@@ -112,10 +118,10 @@ export default function ConversationPage() {
                 <div className="max-w-[75%]">
                   <p className="text-sm px-4 py-2.5 rounded-2xl"
                     style={{
-                      backgroundColor: isMine ? '#4f46e5' : '#1a1a1a',
+                      backgroundColor: isMine ? '#4f46e5' : 'var(--chat-bubble-bg)',
                       color: isMine ? '#fff' : '#d1d5db',
                       borderRadius: isMine ? '18px 18px 4px 18px' : '18px 18px 18px 4px',
-                      border: isMine ? 'none' : '1px solid #242424',
+                      border: isMine ? 'none' : '1px solid var(--chat-bubble-border)',
                     }}>
                     {msg.content}
                   </p>
@@ -132,7 +138,7 @@ export default function ConversationPage() {
 
       {/* Input */}
       <div className="px-4 py-3 flex items-center gap-3 flex-shrink-0"
-        style={{ borderTop: '1px solid #1f1f1f' }}>
+        style={{ borderTop: '1px solid var(--chat-border)', backgroundColor: 'var(--chat-header-bg)' }}>
         <input
           value={text}
           onChange={(e) => setText(e.target.value)}
