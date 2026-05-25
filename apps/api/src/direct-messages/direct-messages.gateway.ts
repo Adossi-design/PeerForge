@@ -1,12 +1,12 @@
 import {
-  WebSocketGateway, WebSocketServer, SubscribeMessage,
+  WebSocketGateway, WebSocketServer,
   OnGatewayConnection, OnGatewayDisconnect,
-  ConnectedSocket, MessageBody,
+  ConnectedSocket,
 } from '@nestjs/websockets';
 import { Server, Socket } from 'socket.io';
-import { Injectable } from '@nestjs/common';
-import { DirectMessagesService } from './direct-messages.service';
+import { Injectable, Logger } from '@nestjs/common';
 import { PrismaService } from '@/database/prisma.service';
+import { authenticateSocket, getSocketUserId } from '@/common/socket-auth.helper';
 
 @WebSocketGateway({
   namespace: '/dm',
@@ -15,55 +15,46 @@ import { PrismaService } from '@/database/prisma.service';
 @Injectable()
 export class DirectMessagesGateway implements OnGatewayConnection, OnGatewayDisconnect {
   @WebSocketServer() server!: Server;
-  private userSocketMap = new Map<string, string>(); // userId -> socketId
+  private readonly logger = new Logger(DirectMessagesGateway.name);
+  // userId -> set of socket ids (one user may have multiple tabs / devices)
+  private userSocketMap = new Map<string, Set<string>>();
 
-  constructor(private service: DirectMessagesService, private prisma: PrismaService) {}
+  constructor(private prisma: PrismaService) {}
 
-  private async resolveUserId(id: string): Promise<string | null> {
-    let user = await this.prisma.user.findUnique({ where: { id } });
-    if (user) return user.id;
-    user = await this.prisma.user.findUnique({ where: { clerkId: id } });
-    return user?.id ?? null;
+  async handleConnection(client: Socket) {
+    const userId = await authenticateSocket(this.prisma, client);
+    if (!userId) {
+      client.emit('error', { message: 'Unauthorized' });
+      client.disconnect(true);
+      return;
+    }
+    if (!this.userSocketMap.has(userId)) this.userSocketMap.set(userId, new Set());
+    this.userSocketMap.get(userId)!.add(client.id);
+    this.logger.debug(`dm socket connected: ${client.id} (user ${userId})`);
   }
 
-  handleConnection(client: Socket) {}
-
   handleDisconnect(client: Socket) {
-    for (const [userId, socketId] of this.userSocketMap.entries()) {
-      if (socketId === client.id) { this.userSocketMap.delete(userId); break; }
+    const userId = getSocketUserId(client);
+    if (!userId) return;
+    const set = this.userSocketMap.get(userId);
+    if (set) {
+      set.delete(client.id);
+      if (set.size === 0) this.userSocketMap.delete(userId);
     }
   }
 
-  @SubscribeMessage('dm_register')
-  async handleRegister(@ConnectedSocket() client: Socket, @MessageBody() data: { userId: string }) {
-    const dbUserId = await this.resolveUserId(data.userId);
-    if (dbUserId) this.userSocketMap.set(dbUserId, client.id);
-    return { success: true };
-  }
-
-  @SubscribeMessage('dm_send')
-  async handleSend(
-    @ConnectedSocket() client: Socket,
-    @MessageBody() data: { senderId: string; receiverId: string; content: string },
-  ) {
-    try {
-      const dbSenderId = await this.resolveUserId(data.senderId);
-      const dbReceiverId = await this.resolveUserId(data.receiverId);
-      if (!dbSenderId || !dbReceiverId) throw new Error('User not found');
-
-      const message = await this.service.sendMessage(dbSenderId, dbReceiverId, data.content);
-
-      // Deliver to receiver if online
-      const receiverSocket = this.userSocketMap.get(dbReceiverId);
-      if (receiverSocket) {
-        this.server.to(receiverSocket).emit('dm_received', message);
-      }
-      // Echo back to sender
-      client.emit('dm_sent', message);
-      return { success: true };
-    } catch (err: any) {
-      client.emit('error', { message: err?.message });
-      return { success: false };
+  /**
+   * Push a DM in real-time to both participants (called from the REST controller
+   * after persisting). Falls back gracefully if either side isn't currently
+   * connected — they'll see the message on next poll/refetch.
+   */
+  deliverMessage(senderId: string, receiverId: string, message: unknown) {
+    const targets = [
+      ...(this.userSocketMap.get(senderId) ?? []),
+      ...(this.userSocketMap.get(receiverId) ?? []),
+    ];
+    for (const sid of targets) {
+      this.server.to(sid).emit('dm_received', message);
     }
   }
 }

@@ -51,14 +51,14 @@ export class DirectMessagesService {
     // Build a map of partnerId -> latest message
     const map = new Map<string, any>();
     for (const m of sent) {
-      const partner = (m as any).receiver;
+      const partner = m.receiver;
       if (!partner) continue;
       if (!map.has(partner.id) || new Date(m.createdAt) > new Date(map.get(partner.id).createdAt)) {
         map.set(partner.id, { ...m, partner });
       }
     }
     for (const m of received) {
-      const partner = (m as any).sender;
+      const partner = m.sender;
       if (!partner) continue;
       if (!map.has(partner.id) || new Date(m.createdAt) > new Date(map.get(partner.id).createdAt)) {
         map.set(partner.id, { ...m, partner });
