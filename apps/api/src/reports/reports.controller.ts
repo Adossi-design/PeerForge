@@ -1,5 +1,7 @@
-import { Controller, Post, Body, Req, BadRequestException } from '@nestjs/common';
-import { ReportsService, ReportTargetType } from './reports.service';
+import { Controller, Post, Body, Req, BadRequestException, UnauthorizedException } from '@nestjs/common';
+import { ReportsService } from './reports.service';
+import { ReportTargetType } from '@/types';
+import { AuthenticatedRequest } from '@/common/auth-request';
 
 @Controller('reports')
 export class ReportsController {
@@ -7,11 +9,11 @@ export class ReportsController {
 
   @Post()
   async createReport(
-    @Req() req: any,
+    @Req() req: AuthenticatedRequest,
     @Body() body: { targetType: ReportTargetType; targetId: string; reason: string; details?: string },
   ) {
     const userId = req.user?.id;
-    if (!userId) throw new BadRequestException('User not authenticated');
+    if (!userId) throw new UnauthorizedException('User not authenticated');
     if (!body.targetType || !body.targetId || !body.reason) {
       throw new BadRequestException('targetType, targetId and reason are required');
     }

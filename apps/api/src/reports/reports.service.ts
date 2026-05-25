@@ -1,7 +1,6 @@
 import { Injectable, BadRequestException } from '@nestjs/common';
 import { PrismaService } from '@/database/prisma.service';
-
-export type ReportTargetType = 'POST' | 'COMMENT' | 'USER';
+import { ReportTargetType, ReportStatus } from '@/types';
 
 @Injectable()
 export class ReportsService {
@@ -16,7 +15,7 @@ export class ReportsService {
   ) {
     // Prevent duplicate pending reports from same user on same target
     const existing = await this.prisma.report.findFirst({
-      where: { reporterId, targetType, targetId, status: 'PENDING' },
+      where: { reporterId, targetType, targetId, status: ReportStatus.PENDING },
     });
     if (existing) throw new BadRequestException('You have already reported this.');
 
@@ -26,11 +25,11 @@ export class ReportsService {
   }
 
   async getPendingCount() {
-    const count = await this.prisma.report.count({ where: { status: 'PENDING' } });
+    const count = await this.prisma.report.count({ where: { status: ReportStatus.PENDING } });
     return { count };
   }
 
-  async getReports(status?: string, skip = 0, take = 50) {
+  async getReports(status?: ReportStatus, skip = 0, take = 50) {
     return this.prisma.report.findMany({
       where: status ? { status } : undefined,
       orderBy: { createdAt: 'desc' },
@@ -39,7 +38,7 @@ export class ReportsService {
     });
   }
 
-  async updateStatus(id: string, status: 'REVIEWED' | 'DISMISSED') {
+  async updateStatus(id: string, status: ReportStatus.REVIEWED | ReportStatus.DISMISSED) {
     return this.prisma.report.update({ where: { id }, data: { status } });
   }
 }
