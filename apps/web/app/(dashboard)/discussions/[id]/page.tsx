@@ -3,6 +3,8 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import { ArrowLeft, Hash, Users, Send } from 'lucide-react';
+import { useAuth } from '@clerk/nextjs';
+import type { Socket } from 'socket.io-client';
 import { useDiscussion, useDiscussionMessages, ChatMessage } from '@/lib/hooks/useApi';
 import { useCurrentUser } from '@/lib/hooks/useApi';
 import { getSocket, socketEvents } from '@/lib/socket';
@@ -19,9 +21,11 @@ function Avatar({ name }: { name: string }) {
 export default function DiscussionRoomPage() {
   const { id } = useParams<{ id: string }>();
   const router = useRouter();
+  const { getToken } = useAuth();
   const { data: currentUser } = useCurrentUser();
   const [message, setMessage] = useState('');
   const [liveMessages, setLiveMessages] = useState<ChatMessage[]>([]);
+  const socketRef = useRef<Socket | null>(null);
   const bottomRef = useRef<HTMLDivElement>(null);
   const joinedRef = useRef(false);
 
@@ -38,51 +42,54 @@ export default function DiscussionRoomPage() {
     bottomRef.current?.scrollIntoView({ behavior: 'smooth' });
   }, [liveMessages]);
 
-  // Socket setup
+  // Socket setup — connect with Clerk token, server resolves userId from it
   useEffect(() => {
     if (!currentUser?.id) return;
+    let cancelled = false;
 
-    const socket = getSocket();
-
-    // Join room
-    if (!joinedRef.current) {
-      socket.emit(socketEvents.JOIN_DISCUSSION, { discussionId: id, userId: currentUser.id });
-      joinedRef.current = true;
-    }
-
-    // Listen for new messages
     const onMessage = (msg: ChatMessage) => {
-      setLiveMessages((prev) => {
-        if (prev.find((m) => m.id === msg.id)) return prev;
-        return [...prev, msg];
-      });
+      setLiveMessages((prev) => (prev.find((m) => m.id === msg.id) ? prev : [...prev, msg]));
     };
 
-    socket.on(socketEvents.MESSAGE_RECEIVED, onMessage);
+    (async () => {
+      const token = await getToken();
+      if (cancelled) return;
+      const socket = getSocket(token);
+      socketRef.current = socket;
+      if (!joinedRef.current) {
+        socket.emit(socketEvents.JOIN_DISCUSSION, { discussionId: id });
+        joinedRef.current = true;
+      }
+      socket.on(socketEvents.MESSAGE_RECEIVED, onMessage);
+    })();
 
     return () => {
-      socket.off(socketEvents.MESSAGE_RECEIVED, onMessage);
-      socket.emit(socketEvents.LEAVE_DISCUSSION, { discussionId: id, userId: currentUser.id });
+      cancelled = true;
+      const socket = socketRef.current;
+      if (socket) {
+        socket.off(socketEvents.MESSAGE_RECEIVED, onMessage);
+        socket.emit(socketEvents.LEAVE_DISCUSSION, { discussionId: id });
+      }
       joinedRef.current = false;
     };
-  }, [id, currentUser?.id]);
+  }, [id, currentUser?.id, getToken]);
 
   const handleSend = () => {
-    if (!message.trim() || !currentUser?.id) return;
-    const socket = getSocket();
+    if (!message.trim()) return;
+    const socket = socketRef.current;
+    if (!socket) return;
     socket.emit(socketEvents.SEND_MESSAGE, {
       discussionId: id,
-      userId: currentUser.id,
       message: { content: message.trim() },
     });
     setMessage('');
   };
 
   return (
-    <div className="flex flex-col h-screen" style={{ backgroundColor: '#0d0d0d' }}>
+    <div className="flex flex-col h-screen" style={{ backgroundColor: 'var(--chat-bg)' }}>
       {/* Header */}
       <div className="flex items-center gap-3 px-6 py-4 flex-shrink-0"
-        style={{ borderBottom: '1px solid #1f1f1f', backgroundColor: '#111111' }}>
+        style={{ borderBottom: '1px solid var(--chat-border)', backgroundColor: 'var(--chat-header-bg)' }}>
         <button onClick={() => router.back()} style={{ color: '#6b7280' }} className="hover:text-white transition-colors">
           <ArrowLeft className="w-5 h-5" />
         </button>
@@ -126,7 +133,7 @@ export default function DiscussionRoomPage() {
 
       {/* Input */}
       <div className="px-6 py-4 flex items-center gap-3 flex-shrink-0"
-        style={{ borderTop: '1px solid #1f1f1f' }}>
+        style={{ borderTop: '1px solid var(--chat-border)', backgroundColor: 'var(--chat-header-bg)' }}>
         <input
           value={message}
           onChange={(e) => setMessage(e.target.value)}
