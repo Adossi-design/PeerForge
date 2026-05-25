@@ -73,7 +73,7 @@ export interface AppNotification {
   id: string;
   type: string;
   title: string;
-  description?: string;
+  message?: string;
   link?: string;
   read: boolean;
   createdAt: string;
@@ -93,6 +93,28 @@ export function useMarkAllRead() {
   return useMutation({
     mutationFn: () => apiFetch('/notifications/read-all', { method: 'PUT' }),
     onSuccess: () => qc.invalidateQueries({ queryKey: ['notifications'] }),
+  });
+}
+
+export function useMarkNotificationRead() {
+  const apiFetch = useApiFetch();
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (id: string) => apiFetch(`/notifications/${id}/read`, { method: 'PUT' }),
+    onMutate: async (id) => {
+      // Optimistic: flip read=true in the cached list so the sidebar badge
+      // decrements immediately, without waiting for the server roundtrip.
+      await qc.cancelQueries({ queryKey: ['notifications'] });
+      const previous = qc.getQueryData<AppNotification[]>(['notifications']);
+      qc.setQueryData<AppNotification[]>(['notifications'], (old) =>
+        old?.map((n) => (n.id === id ? { ...n, read: true } : n)),
+      );
+      return { previous };
+    },
+    onError: (_err, _id, ctx) => {
+      if (ctx?.previous) qc.setQueryData(['notifications'], ctx.previous);
+    },
+    onSettled: () => qc.invalidateQueries({ queryKey: ['notifications'] }),
   });
 }
 
@@ -239,10 +261,19 @@ export function useDmInbox() {
 
 export function useDmConversation(otherUserId: string) {
   const apiFetch = useApiFetch();
+  const qc = useQueryClient();
   const { isSignedIn } = useAuth();
   return useQuery<DirectMessage[]>({
     queryKey: ['dm-conversation', otherUserId],
-    queryFn: () => apiFetch(`/messages/${otherUserId}`).then((d) => d.messages ?? d),
+    queryFn: async () => {
+      const data = await apiFetch(`/messages/${otherUserId}`);
+      const messages = data.messages ?? data;
+      // The server auto-marks received messages as read when the conversation
+      // is fetched — refresh the inbox cache so the sidebar badge decrements
+      // immediately instead of waiting for the next 5s poll.
+      qc.invalidateQueries({ queryKey: ['dm-inbox'] });
+      return messages;
+    },
     enabled: !!isSignedIn && !!otherUserId,
     refetchInterval: 3000,
   });
@@ -290,6 +321,8 @@ export function useFollow(userId: string) {
       qc.invalidateQueries({ queryKey: ['follow-status', userId] });
       qc.invalidateQueries({ queryKey: ['follow-counts', userId] });
       qc.invalidateQueries({ queryKey: ['current-user'] });
+      // Followee receives +1 reputation — refresh their profile cache
+      qc.invalidateQueries({ queryKey: ['user', userId] });
     },
   });
 }
