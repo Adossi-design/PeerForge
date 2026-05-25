@@ -64,7 +64,6 @@ export default function PostsPage() {
           .map((t) => t.trim())
           .filter((t) => t),
         teamSize: formData.teamSize,
-        userId: user?.id,
       });
 
       // Convert files to base64 attachments

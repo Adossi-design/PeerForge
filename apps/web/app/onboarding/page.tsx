@@ -87,7 +87,7 @@ export default function OnboardingPage() {
     try {
       await updateProfile.mutateAsync({
         id: user.id,
-        data: { ...form, skills, interests } as any,
+        data: { ...form, skills, interests },
       });
       router.replace('/home');
     } catch {

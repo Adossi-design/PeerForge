@@ -100,7 +100,7 @@ export default function SettingsPage() {
           skills,
           interests,
           ...(avatarPreview ? { avatarUrl: avatarPreview } : {}),
-        } as any,
+        },
       });
       toast('Profile saved successfully!');
     } catch {
