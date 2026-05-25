@@ -5,9 +5,10 @@ import {
   Delete,
   Param,
   Req,
-  BadRequestException,
+  UnauthorizedException,
 } from '@nestjs/common';
 import { NotificationsService } from './notifications.service';
+import { AuthenticatedRequest } from '@/common/auth-request';
 
 @Controller('notifications')
 export class NotificationsController {
@@ -17,10 +18,10 @@ export class NotificationsController {
    * Get user notifications
    */
   @Get()
-  async getNotifications(@Req() req: any) {
+  async getNotifications(@Req() req: AuthenticatedRequest) {
     const userId = req.user?.id;
     if (!userId) {
-      throw new BadRequestException('User not authenticated');
+      throw new UnauthorizedException('User not authenticated');
     }
 
     const notifications =
@@ -32,10 +33,10 @@ export class NotificationsController {
    * Get unread notification count
    */
   @Get('unread-count')
-  async getUnreadCount(@Req() req: any) {
+  async getUnreadCount(@Req() req: AuthenticatedRequest) {
     const userId = req.user?.id;
     if (!userId) {
-      throw new BadRequestException('User not authenticated');
+      throw new UnauthorizedException('User not authenticated');
     }
 
     const count = await this.notificationsService.getUnreadCount(userId);
@@ -55,10 +56,10 @@ export class NotificationsController {
    * Mark all as read
    */
   @Put('read-all')
-  async markAllAsRead(@Req() req: any) {
+  async markAllAsRead(@Req() req: AuthenticatedRequest) {
     const userId = req.user?.id;
     if (!userId) {
-      throw new BadRequestException('User not authenticated');
+      throw new UnauthorizedException('User not authenticated');
     }
 
     await this.notificationsService.markAllAsRead(userId);

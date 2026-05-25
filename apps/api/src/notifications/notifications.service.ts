@@ -7,14 +7,12 @@ export class NotificationsService {
   constructor(private prisma: PrismaService) {}
 
   async getUserNotifications(userId: string, skip = 0, take = 20) {
-    const notifications = await this.prisma.notification.findMany({
+    return this.prisma.notification.findMany({
       where: { userId },
       skip,
       take,
       orderBy: { createdAt: 'desc' },
     });
-    // Normalize: expose `message` field as `description` for frontend compatibility
-    return notifications.map((n) => ({ ...n, description: (n as any).message }));
   }
 
   async getUnreadCount(userId: string) {
