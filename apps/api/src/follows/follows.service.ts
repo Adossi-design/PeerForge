@@ -1,8 +1,10 @@
-import { Injectable } from '@nestjs/common';
+import { Injectable, Logger } from '@nestjs/common';
 import { PrismaService } from '@/database/prisma.service';
 
 @Injectable()
 export class FollowsService {
+  private readonly logger = new Logger(FollowsService.name);
+
   constructor(private prisma: PrismaService) {}
 
   async follow(followerId: string, followingId: string) {
@@ -15,7 +17,8 @@ export class FollowsService {
       return { following: false };
     }
     await this.prisma.follow.create({ data: { followerId, followingId } });
-    await this.prisma.user.update({ where: { id: followingId }, data: { reputation: { increment: 1 } } }).catch(() => {});
+    await this.prisma.user.update({ where: { id: followingId }, data: { reputation: { increment: 1 } } })
+      .catch((err) => this.logger.warn(`rep increment (follow) failed for user ${followingId}: ${err?.message}`));
     return { following: true };
   }
 
