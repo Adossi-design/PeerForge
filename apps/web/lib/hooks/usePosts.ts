@@ -40,6 +40,8 @@ export interface Post {
   shareCount?: number;
   isLiked?: boolean;
   isSaved?: boolean;
+  /** Up to 3 most recent likers — used by the feed UI to render a small avatar stack. */
+  topLikers?: { id: string; username: string; fullName?: string | null; avatarUrl?: string | null }[];
 }
 
 export interface CreatePostInput {
@@ -91,10 +93,9 @@ export function useCreatePost() {
   const { getToken } = useAuth();
   const qc = useQueryClient();
   return useMutation({
-    mutationFn: async (input: CreatePostInput & { userId?: string }) => {
-      const { userId, ...body } = input as any;
+    mutationFn: async (input: CreatePostInput) => {
       const token = await getToken();
-      return fetchWithToken('/posts', token, { method: 'POST', body: JSON.stringify(body) });
+      return fetchWithToken('/posts', token, { method: 'POST', body: JSON.stringify(input) });
     },
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ['posts'] });
@@ -122,7 +123,15 @@ export function useLikePost() {
       qc.setQueryData(['post', postId], (old: Post | undefined) =>
         old ? { ...old, _count: { ...old._count, likes: old._count.likes + (data.liked ? 1 : -1) }, isLiked: data.liked } : old
       );
-      if (data.liked) qc.invalidateQueries({ queryKey: ['current-user'] });
+      // Liking another user's post grants them +2 rep — refresh affected caches
+      if (data.liked) {
+        qc.invalidateQueries({ queryKey: ['current-user'] });
+        // Refresh post author's profile (rep may have changed)
+        const cachedPost = qc.getQueryData<Post>(['post', postId]);
+        if (cachedPost?.author?.id) {
+          qc.invalidateQueries({ queryKey: ['user', cachedPost.author.id] });
+        }
+      }
     },
   });
 }
@@ -145,6 +154,27 @@ export function useSavePost() {
       qc.setQueryData(['post', postId], (old: Post | undefined) => old ? update(old) : old);
       qc.invalidateQueries({ queryKey: ['saved-posts'] });
     },
+  });
+}
+
+export interface Liker {
+  id: string;
+  username: string;
+  fullName?: string | null;
+  avatarUrl?: string | null;
+}
+
+export function usePostLikers(postId: string, enabled = true) {
+  const { getToken } = useAuth();
+  return useQuery<Liker[]>({
+    queryKey: ['post-likers', postId],
+    queryFn: async () => {
+      let token: string | null = null;
+      try { token = await getToken(); } catch {}
+      const data = await fetchWithToken(`/posts/${postId}/likes`, token);
+      return (data.users ?? data) as Liker[];
+    },
+    enabled: enabled && !!postId,
   });
 }
 
@@ -225,6 +255,11 @@ export function useCreateComment() {
     onSuccess: (_, vars) => {
       qc.invalidateQueries({ queryKey: ['comments', vars.postId] });
       qc.invalidateQueries({ queryKey: ['current-user'] });
+      // Commenting on another user's post grants them +3 rep — refresh their cache
+      const cachedPost = qc.getQueryData<Post>(['post', vars.postId]);
+      if (cachedPost?.author?.id) {
+        qc.invalidateQueries({ queryKey: ['user', cachedPost.author.id] });
+      }
     },
   });
 }
