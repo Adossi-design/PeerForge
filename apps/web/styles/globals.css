@@ -46,6 +46,24 @@
     --text-secondary: #d1d5db;
     --text-muted:     #9ca3af;
     --text-faint:     #6b7280;
+
+    /* Post card section backgrounds — balanced midnight-purple palette.
+       Header/footer slightly darker than the body to frame it; comment area
+       sits between the two so it reads as a distinct surface. */
+    --post-header-bg:       #15102a;
+    --post-body-bg:         #1c1638;
+    --post-footer-bg:       #15102a;
+    --post-comment-bg:      #181230;
+    --post-comment-item-bg: #261d4a;
+    --post-border:          #2d2348;
+    --post-border-subtle:   #251c40;
+
+    /* Chat surfaces — discussion rooms + direct-message conversations */
+    --chat-bg:            #0d0d0d;
+    --chat-header-bg:     #111111;
+    --chat-bubble-bg:     #1a1a1a;
+    --chat-bubble-border: #242424;
+    --chat-border:        #1f1f1f;
   }
 
   [data-theme="light"] {
@@ -77,6 +95,25 @@
     /* Accent — concentrated indigo/violet */
     --accent-vivid:   #4f46e5;
     --accent-soft:    #ede8ff;
+
+    /* Post card sections — fully white in light mode, sections separated by
+       borders only. Comment items get a faint lavender for visual separation
+       from their containing card. */
+    --post-header-bg:  #ffffff;
+    --post-body-bg:    #ffffff;
+    --post-footer-bg:  #ffffff;
+    --post-comment-bg: #ffffff;
+    --post-comment-item-bg: #f5f3ff;
+    --post-border:     #e5e7eb;
+    --post-border-subtle: #ddd5f8;
+
+    /* Chat surfaces in light mode — fully white, lavender for incoming
+       bubbles so they stand out from the white chat background. */
+    --chat-bg:            #ffffff;
+    --chat-header-bg:     #ffffff;
+    --chat-bubble-bg:     #f5f3ff;
+    --chat-bubble-border: #ddd5f8;
+    --chat-border:        #e5e7eb;
   }
 
   * {
@@ -103,18 +140,35 @@
 [data-theme="light"] body,
 [data-theme="light"] main { background-color: #f0eeff !important; color: #12082a !important; }
 
-/* ─ Left sidebar toggle pill — always visible regardless of theme ─ */
+/* ─ Theme toggle — always visible in both themes ─
+   Uses dedicated class names so the universal `aside.fixed *` reset can't
+   accidentally blank out the pill or its dot. */
+.theme-toggle-pill { background-color: #4f46e5 !important; }
+.theme-toggle-pill--admin { background: linear-gradient(90deg, #4f46e5, #ec4899) !important; }
+.theme-toggle-dot { background-color: #ffffff !important; }
+/* Mobile header toggle — keep visible on both white and gradient headers */
+.theme-toggle-mobile {
+  background-color: rgba(255,255,255,0.15) !important;
+  border: 1px solid rgba(139,92,246,0.5) !important;
+  color: #c4b5fd !important;
+}
+[data-theme="light"] .theme-toggle-mobile {
+  background-color: #ede8ff !important;
+  border-color: #7c6bc8 !important;
+  color: #4338ca !important;
+}
+/* Legacy fallbacks for any other inline-style colored elements */
 [data-theme="light"] aside.fixed div[style*="backgroundColor: #4f46e5"],
 [data-theme="light"] aside.fixed div[style*="background-color: #4f46e5"] { background-color: #4f46e5 !important; }
 [data-theme="light"] aside.fixed span[style*="backgroundColor: #ffffff"],
-[data-theme="light"] aside.fixed span[style*="background-color: #ffffff"] { background-color: #ffffff !important; color: transparent !important; }
+[data-theme="light"] aside.fixed span[style*="background-color: #ffffff"] { background-color: #ffffff !important; }
 [data-theme="light"] aside.fixed { background: #1a1a2e !important; border-color: #16213e !important; }
-[data-theme="light"] aside.fixed *,
+[data-theme="light"] aside.fixed *:not(.theme-toggle-pill):not(.theme-toggle-dot),
 [data-theme="light"] aside.fixed a,
-[data-theme="light"] aside.fixed button,
-[data-theme="light"] aside.fixed span,
+[data-theme="light"] aside.fixed button:not(.theme-toggle-btn),
+[data-theme="light"] aside.fixed span:not(.theme-toggle-dot),
 [data-theme="light"] aside.fixed p,
-[data-theme="light"] aside.fixed div { color: #c4b5fd !important; background-color: transparent !important; }
+[data-theme="light"] aside.fixed div:not(.theme-toggle-pill) { color: #c4b5fd !important; background-color: transparent !important; }
 /* Active nav item — purple block */
 [data-theme="light"] aside.fixed a[style*="#3d2b8e"] { background: #3d2b8e !important; }
 [data-theme="light"] aside.fixed a[style*="#3d2b8e"],
@@ -212,21 +266,24 @@
 [data-theme="light"] input::placeholder,
 [data-theme="light"] textarea::placeholder { color: #7060a8 !important; }
 
-/* ─ Global page-level text (outside cards and left sidebar) ─ */
-[data-theme="light"] .text-white:not(aside.fixed):not(aside.fixed *) { color: #12082a !important; }
-[data-theme="light"] .text-gray-400:not(aside.fixed):not(aside.fixed *) { color: #4a3580 !important; }
-[data-theme="light"] .text-gray-500:not(aside.fixed):not(aside.fixed *) { color: #6b4fa0 !important; }
-[data-theme="light"] .hover\:text-white:hover:not(aside.fixed):not(aside.fixed *) { color: #12082a !important; }
-[data-theme="light"] .hover\:text-gray-200:hover:not(aside.fixed):not(aside.fixed *) { color: #261550 !important; }
-/* Inline style text colors on page level — exclude left sidebar */
-[data-theme="light"] :not(aside.fixed):not(aside.fixed *)[style*="color: #6b7280"],
-[data-theme="light"] :not(aside.fixed):not(aside.fixed *)[style*="color:#6b7280"] { color: #4a3580 !important; }
-[data-theme="light"] :not(aside.fixed):not(aside.fixed *)[style*="color: #9ca3af"],
-[data-theme="light"] :not(aside.fixed):not(aside.fixed *)[style*="color:#9ca3af"] { color: #4a3580 !important; }
-[data-theme="light"] :not(aside.fixed):not(aside.fixed *)[style*="color: #d1d5db"],
-[data-theme="light"] :not(aside.fixed):not(aside.fixed *)[style*="color:#d1d5db"] { color: #261550 !important; }
-[data-theme="light"] :not(aside.fixed):not(aside.fixed *)[style*="color: #ffffff"],
-[data-theme="light"] :not(aside.fixed):not(aside.fixed *)[style*="color:#ffffff"] { color: #12082a !important; }
+/* ─ Global page-level text (outside cards and left sidebar) ─
+   `.on-dark-banner` opts an element (and its descendants) OUT of light-mode
+   darkening. Use it on text that sits over a dark gradient banner (e.g. the
+   profile name + username inside the profile header banner). */
+[data-theme="light"] .text-white:not(aside.fixed):not(aside.fixed *):not(.on-dark-banner):not(.on-dark-banner *) { color: #12082a !important; }
+[data-theme="light"] .text-gray-400:not(aside.fixed):not(aside.fixed *):not(.on-dark-banner):not(.on-dark-banner *) { color: #4a3580 !important; }
+[data-theme="light"] .text-gray-500:not(aside.fixed):not(aside.fixed *):not(.on-dark-banner):not(.on-dark-banner *) { color: #6b4fa0 !important; }
+[data-theme="light"] .hover\:text-white:hover:not(aside.fixed):not(aside.fixed *):not(.on-dark-banner):not(.on-dark-banner *) { color: #12082a !important; }
+[data-theme="light"] .hover\:text-gray-200:hover:not(aside.fixed):not(aside.fixed *):not(.on-dark-banner):not(.on-dark-banner *) { color: #261550 !important; }
+/* Inline style text colors on page level — exclude left sidebar + banner overlays */
+[data-theme="light"] :not(aside.fixed):not(aside.fixed *):not(.on-dark-banner):not(.on-dark-banner *)[style*="color: #6b7280"],
+[data-theme="light"] :not(aside.fixed):not(aside.fixed *):not(.on-dark-banner):not(.on-dark-banner *)[style*="color:#6b7280"] { color: #4a3580 !important; }
+[data-theme="light"] :not(aside.fixed):not(aside.fixed *):not(.on-dark-banner):not(.on-dark-banner *)[style*="color: #9ca3af"],
+[data-theme="light"] :not(aside.fixed):not(aside.fixed *):not(.on-dark-banner):not(.on-dark-banner *)[style*="color:#9ca3af"] { color: #4a3580 !important; }
+[data-theme="light"] :not(aside.fixed):not(aside.fixed *):not(.on-dark-banner):not(.on-dark-banner *)[style*="color: #d1d5db"],
+[data-theme="light"] :not(aside.fixed):not(aside.fixed *):not(.on-dark-banner):not(.on-dark-banner *)[style*="color:#d1d5db"] { color: #261550 !important; }
+[data-theme="light"] :not(aside.fixed):not(aside.fixed *):not(.on-dark-banner):not(.on-dark-banner *)[style*="color: #ffffff"],
+[data-theme="light"] :not(aside.fixed):not(aside.fixed *):not(.on-dark-banner):not(.on-dark-banner *)[style*="color:#ffffff"] { color: #12082a !important; }
 
 /* ─ Filter buttons / tab pills (outside cards) ─ */
 [data-theme="light"] button[style*="color: #9ca3af"],
