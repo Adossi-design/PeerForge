@@ -7,10 +7,9 @@ import { Home, Compass, FolderOpen, MessageSquare, Bell, User, Settings, Zap, Pl
 import { cn } from '@/lib/utils';
 import { NewPostModal } from '@/components/features/posts/NewPostModal';
 import { useNotifications, useCurrentUser, useDmInbox } from '@/lib/hooks/useApi';
-import { useSavedPosts } from '@/lib/hooks/usePosts';
 import { useRouter } from 'next/navigation';
 import { useTheme } from '@/lib/context/ThemeContext';
-import { Sun, Moon } from 'lucide-react';
+import { SidebarThemeToggle, MobileThemeToggle } from '@/components/common/ThemeToggle';
 
 const NAV = [
   { href: '/home',          icon: Home,         label: 'Home' },
@@ -35,7 +34,7 @@ const BOTTOM_NAV = [
 
 export default function DashboardLayout({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
-  const { theme, toggleTheme } = useTheme();
+  const { theme } = useTheme();
   const [showNewPost, setShowNewPost] = useState(false);
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [scrollProgress, setScrollProgress] = useState(0);
@@ -43,11 +42,9 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
   const { data: notifications } = useNotifications();
   const { data: currentUser } = useCurrentUser();
   const { data: dmInbox } = useDmInbox();
-  const { data: savedPosts } = useSavedPosts();
   const router = useRouter();
   const unreadCount = (notifications ?? []).filter((n) => !n.read).length;
   const unreadDms = (dmInbox ?? []).filter((c) => !c.read && c.senderId !== currentUser?.id).length;
-  const savedCount = savedPosts?.length ?? 0;
 
   // Determine active section for header color
   const getActiveSection = () => {
@@ -170,28 +167,36 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
             const active = pathname === href || pathname.startsWith(href);
             const badge = (label === 'Notifications' && unreadCount > 0) ? unreadCount
               : (label === 'Messages' && unreadDms > 0) ? unreadDms
-              : (label === 'Saved' && savedCount > 0) ? savedCount
               : 0;
             return (
               <Link
                 key={href}
                 href={href}
                 onClick={() => setSidebarOpen(false)}
+                aria-current={active ? 'page' : undefined}
                 className={cn(
-                  'flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-all duration-150',
+                  'relative flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-all duration-150',
                   active ? 'text-white' : 'text-purple-200 hover:text-white hover:bg-white/10',
                 )}
                 style={active ? {
-                  background: '#3d2b8e',
-                  borderRadius: '8px',
-                  paddingLeft: '12px',
-                  transform: 'translateX(2px)',
+                  background: 'linear-gradient(90deg, #4f46e5 0%, #7c3aed 100%)',
+                  borderRadius: '10px',
+                  paddingLeft: '14px',
+                  transform: 'translateX(4px)',
+                  boxShadow: '0 4px 14px rgba(79, 70, 229, 0.35), inset 0 0 0 1px rgba(255,255,255,0.08)',
                 } : {}}
                 onMouseEnter={(e) => { if (!active) (e.currentTarget as HTMLAnchorElement).style.transform = 'translateX(3px)'; }}
                 onMouseLeave={(e) => { if (!active) (e.currentTarget as HTMLAnchorElement).style.transform = 'translateX(0)'; }}
               >
+                {active && (
+                  <span
+                    aria-hidden
+                    className="absolute left-0 top-1/2 -translate-y-1/2 w-1 h-6 rounded-r-full"
+                    style={{ backgroundColor: '#ffffff' }}
+                  />
+                )}
                 <div className="relative flex-shrink-0">
-                  <Icon className={cn('w-5 h-5', active ? 'text-indigo-300' : 'text-purple-300')} />
+                  <Icon className={cn('w-5 h-5', active ? 'text-white' : 'text-purple-300')} />
                   {badge > 0 && (
                     <span className="absolute -top-1.5 -right-1.5 min-w-[16px] h-4 px-1 rounded-full text-[10px] font-bold text-white flex items-center justify-center"
                       style={{ backgroundColor: '#ef4444' }}>
@@ -209,33 +214,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
 
         {/* Theme toggle + New Post Button */}
         <div className="p-4 space-y-2">
-          <button
-            onClick={toggleTheme}
-            className="w-full flex items-center justify-between px-3 py-2.5 rounded-lg text-sm font-medium transition-colors text-purple-200 hover:text-white"
-            style={{ border: '1px solid rgba(139,92,246,0.3)', backgroundColor: 'rgba(255,255,255,0.05)' }}
-          >
-            <span className="flex items-center gap-2">
-              {theme === 'dark'
-                ? <Moon className="w-4 h-4 text-indigo-300" />
-                : <Sun className="w-4 h-4 text-yellow-300" />}
-              {theme === 'dark' ? 'Dark mode' : 'Light mode'}
-            </span>
-            <div
-              className="relative flex-shrink-0 rounded-full transition-colors duration-200"
-              style={{ width: '40px', height: '22px', backgroundColor: '#4f46e5' }}
-            >
-              <span
-                className="absolute rounded-full transition-transform duration-200"
-                style={{
-                  top: '2px', left: '0',
-                  width: '18px', height: '18px',
-                  backgroundColor: '#ffffff',
-                  boxShadow: '0 1px 3px rgba(0,0,0,0.3)',
-                  transform: theme === 'dark' ? 'translateX(20px)' : 'translateX(2px)',
-                }}
-              />
-            </div>
-          </button>
+          <SidebarThemeToggle />
           <button
             onClick={() => { setShowNewPost(true); setSidebarOpen(false); }}
             className="w-full flex items-center justify-center gap-2 text-white font-semibold py-3 rounded-xl transition-opacity hover:opacity-90"
@@ -287,15 +266,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
           >
             <Plus className="w-4 h-4" />
           </button>
-          <button
-            onClick={toggleTheme}
-            className="w-8 h-8 rounded-lg flex items-center justify-center transition-colors"
-            style={{ backgroundColor: 'rgba(255,255,255,0.1)', border: '1px solid rgba(139,92,246,0.4)' }}
-          >
-            {theme === 'dark'
-              ? <Moon className="w-4 h-4 text-indigo-300" />
-              : <Sun className="w-4 h-4 text-yellow-300" />}
-          </button>
+          <MobileThemeToggle />
         </header>
 
         {/* Page content */}
@@ -319,9 +290,24 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
             <Link
               key={href}
               href={href}
-              className="flex flex-col items-center gap-0.5 px-3 py-1.5 rounded-lg transition-all duration-150"
-              style={{ color: active ? '#c4b5fd' : '#a78bfa', transform: active ? 'translateY(-2px)' : 'translateY(0)', backgroundColor: active ? 'rgba(139,92,246,0.15)' : 'transparent' }}
+              aria-current={active ? 'page' : undefined}
+              className="relative flex flex-col items-center gap-0.5 px-3 py-1.5 rounded-lg transition-all duration-150"
+              style={{
+                color: active ? '#ffffff' : '#a78bfa',
+                transform: active ? 'translateY(-3px)' : 'translateY(0)',
+                background: active
+                  ? 'linear-gradient(135deg, rgba(79,70,229,0.55), rgba(124,58,237,0.55))'
+                  : 'transparent',
+                boxShadow: active ? '0 4px 12px rgba(79, 70, 229, 0.35)' : 'none',
+              }}
             >
+              {active && (
+                <span
+                  aria-hidden
+                  className="absolute -top-0.5 left-1/2 -translate-x-1/2 w-6 h-0.5 rounded-full"
+                  style={{ backgroundColor: '#ffffff' }}
+                />
+              )}
               <div className="relative">
                 <Icon className="w-5 h-5" />
                 {badge > 0 && (
