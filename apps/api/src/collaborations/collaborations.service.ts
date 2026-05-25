@@ -1,10 +1,12 @@
-import { Injectable, NotFoundException, BadRequestException, ForbiddenException } from '@nestjs/common';
+import { Injectable, Logger, NotFoundException, BadRequestException, ForbiddenException } from '@nestjs/common';
 import { PrismaService } from '@/database/prisma.service';
 import { NotificationsService } from '@/notifications/notifications.service';
-import { NotificationType } from '@/types';
+import { NotificationType, CollaborationStatus } from '@/types';
 
 @Injectable()
 export class CollaborationsService {
+  private readonly logger = new Logger(CollaborationsService.name);
+
   constructor(
     private prisma: PrismaService,
     private notifications: NotificationsService,
@@ -26,7 +28,7 @@ export class CollaborationsService {
     const requester = await this.prisma.user.findUnique({ where: { id: userId }, select: { username: true } });
 
     const collab = await this.prisma.collaboration.create({
-      data: { postId, userId, message, status: 'PENDING' },
+      data: { postId, userId, message, status: CollaborationStatus.PENDING },
     });
 
     await this.notifications.createNotification(
@@ -50,9 +52,9 @@ export class CollaborationsService {
     });
     if (!collab) throw new NotFoundException('Collaboration request not found');
     if (collab.post.authorId !== ownerId) throw new ForbiddenException('Only the post author can respond');
-    if (collab.status !== 'PENDING') throw new BadRequestException('This request has already been responded to');
+    if (collab.status !== CollaborationStatus.PENDING) throw new BadRequestException('This request has already been responded to');
 
-    const status = accept ? 'ACCEPTED' : 'REJECTED';
+    const status = accept ? CollaborationStatus.ACCEPTED : CollaborationStatus.REJECTED;
     const updated = await this.prisma.collaboration.update({
       where: { id: collaborationId },
       data: { status },
@@ -73,8 +75,10 @@ export class CollaborationsService {
     if (accept) {
       // +5 rep for post author, +2 rep for requester
       await Promise.all([
-        this.prisma.user.update({ where: { id: ownerId }, data: { reputation: { increment: 5 } } }).catch(() => {}),
-        this.prisma.user.update({ where: { id: collab.user.id }, data: { reputation: { increment: 2 } } }).catch(() => {}),
+        this.prisma.user.update({ where: { id: ownerId }, data: { reputation: { increment: 5 } } })
+          .catch((err) => this.logger.warn(`rep increment (collab-owner) failed for user ${ownerId}: ${err?.message}`)),
+        this.prisma.user.update({ where: { id: collab.user.id }, data: { reputation: { increment: 2 } } })
+          .catch((err) => this.logger.warn(`rep increment (collab-requester) failed for user ${collab.user.id}: ${err?.message}`)),
       ]);
     }
 

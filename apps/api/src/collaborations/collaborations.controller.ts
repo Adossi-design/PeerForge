@@ -1,5 +1,6 @@
-import { Controller, Post, Put, Get, Param, Body, Req, BadRequestException } from '@nestjs/common';
+import { Controller, Post, Put, Get, Param, Body, Req, BadRequestException, UnauthorizedException } from '@nestjs/common';
 import { CollaborationsService } from './collaborations.service';
+import { AuthenticatedRequest } from '@/common/auth-request';
 
 @Controller('collaborations')
 export class CollaborationsController {
@@ -9,10 +10,10 @@ export class CollaborationsController {
   async request(
     @Param('postId') postId: string,
     @Body('message') message: string,
-    @Req() req: any,
+    @Req() req: AuthenticatedRequest,
   ) {
     const userId = req.user?.id;
-    if (!userId) throw new BadRequestException('User not authenticated');
+    if (!userId) throw new UnauthorizedException('User not authenticated');
     const collab = await this.collaborationsService.requestCollaboration(postId, userId, message);
     return { collab };
   }
@@ -21,10 +22,10 @@ export class CollaborationsController {
   async respond(
     @Param('id') id: string,
     @Body('accept') accept: boolean,
-    @Req() req: any,
+    @Req() req: AuthenticatedRequest,
   ) {
     const userId = req.user?.id;
-    if (!userId) throw new BadRequestException('User not authenticated');
+    if (!userId) throw new UnauthorizedException('User not authenticated');
     const collab = await this.collaborationsService.respondToCollaboration(id, userId, accept);
     return { collab };
   }
@@ -36,16 +37,16 @@ export class CollaborationsController {
   }
 
   @Get('posts/:postId/status')
-  async getStatus(@Param('postId') postId: string, @Req() req: any) {
+  async getStatus(@Param('postId') postId: string, @Req() req: AuthenticatedRequest) {
     const userId = req.user?.id;
-    if (!userId) throw new BadRequestException('User not authenticated');
+    if (!userId) throw new UnauthorizedException('User not authenticated');
     return this.collaborationsService.getCollaborationStatus(postId, userId);
   }
 
   @Get('mine')
-  async getMine(@Req() req: any) {
+  async getMine(@Req() req: AuthenticatedRequest) {
     const userId = req.user?.id;
-    if (!userId) throw new BadRequestException('User not authenticated');
+    if (!userId) throw new UnauthorizedException('User not authenticated');
     const collaborations = await this.collaborationsService.getUserCollaborations(userId);
     return { collaborations };
   }
