@@ -8,8 +8,11 @@ import {
   Query,
   Req,
   BadRequestException,
+  UnauthorizedException,
 } from '@nestjs/common';
 import { CommentsService } from './comments.service';
+import { clampInt, SKIP_DEFAULT, SKIP_MAX, TAKE_DEFAULT, TAKE_MAX } from '@/common/pagination';
+import { AuthenticatedRequest } from '@/common/auth-request';
 
 @Controller('comments')
 export class CommentsController {
@@ -21,10 +24,10 @@ export class CommentsController {
   @Post()
   async createComment(
     @Body() data: { postId: string; content: string },
-    @Req() req: any,
+    @Req() req: AuthenticatedRequest,
   ) {
     const userId = req.user?.id;
-    if (!userId) throw new BadRequestException('User not authenticated');
+    if (!userId) throw new UnauthorizedException('User not authenticated');
 
     // Validate required fields
     if (!data.postId || !data.content?.trim()) {
@@ -50,8 +53,8 @@ export class CommentsController {
   ) {
     const comments = await this.commentsService.getComments(
       postId,
-      parseInt(skip),
-      parseInt(take),
+      clampInt(skip, SKIP_DEFAULT, SKIP_MAX),
+      clampInt(take, TAKE_DEFAULT, TAKE_MAX),
     );
     return { comments };
   }
@@ -60,10 +63,10 @@ export class CommentsController {
    * Delete comment
    */
   @Delete(':id')
-  async deleteComment(@Param('id') commentId: string, @Req() req: any) {
+  async deleteComment(@Param('id') commentId: string, @Req() req: AuthenticatedRequest) {
     const userId = req.user?.id;
     if (!userId) {
-      throw new BadRequestException('User not authenticated');
+      throw new UnauthorizedException('User not authenticated');
     }
 
     await this.commentsService.deleteComment(commentId, userId);
@@ -74,10 +77,10 @@ export class CommentsController {
    * Like comment
    */
   @Post(':id/like')
-  async likeComment(@Param('id') commentId: string, @Req() req: any) {
+  async likeComment(@Param('id') commentId: string, @Req() req: AuthenticatedRequest) {
     const userId = req.user?.id;
     if (!userId) {
-      throw new BadRequestException('User not authenticated');
+      throw new UnauthorizedException('User not authenticated');
     }
 
     const result = await this.commentsService.likeComment(commentId, userId);

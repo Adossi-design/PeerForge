@@ -1,4 +1,4 @@
-import { Injectable, NotFoundException, ForbiddenException } from '@nestjs/common';
+import { Injectable, Logger, NotFoundException, ForbiddenException } from '@nestjs/common';
 import { PrismaService } from '@/database/prisma.service';
 import { NotificationsService } from '@/notifications/notifications.service';
 import { NotificationType } from '@/types';
@@ -9,6 +9,8 @@ export class CommentDto {
 
 @Injectable()
 export class CommentsService {
+  private readonly logger = new Logger(CommentsService.name);
+
   constructor(
     private prisma: PrismaService,
     private notifications: NotificationsService,
@@ -36,7 +38,8 @@ export class CommentsService {
         `/posts/${postId}`,
       );
       // +3 rep for post author when commented on
-      await this.prisma.user.update({ where: { id: post.authorId }, data: { reputation: { increment: 3 } } }).catch(() => {});
+      await this.prisma.user.update({ where: { id: post.authorId }, data: { reputation: { increment: 3 } } })
+        .catch((err) => this.logger.warn(`rep increment (comment) failed for user ${post.authorId}: ${err?.message}`));
     }
     return comment;
   }
