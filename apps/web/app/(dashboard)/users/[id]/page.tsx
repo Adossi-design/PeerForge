@@ -79,18 +79,13 @@ export default function UserProfilePage() {
         <div style={{ height: '110px', background: 'linear-gradient(135deg, #3b1f6e 0%, #1a2a5e 50%, #0f3d3d 100%)' }} />
 
         <div className="px-6" style={{ marginTop: '-40px' }}>
-          <div className="flex items-end justify-between mb-4">
-            <div className="flex items-end gap-4">
-              <div className="w-20 h-20 rounded-full flex items-center justify-center font-bold text-white overflow-hidden flex-shrink-0"
-                style={{ backgroundColor: '#2a2a2a', border: '4px solid #1a1a1a', fontSize: '18px' }}>
-                {user.avatarUrl
-                  ? <img src={user.avatarUrl} alt="avatar" className="w-full h-full object-cover" />
-                  : initials}
-              </div>
-              <div className="pb-1">
-                <h2 className="text-lg font-bold text-white">{user.fullName || user.username}</h2>
-                <p className="text-sm" style={{ color: '#6b7280' }}>@{user.username}</p>
-              </div>
+          {/* Avatar (overlaps banner edge) + action buttons on the right */}
+          <div className="flex items-end justify-between mb-3">
+            <div className="w-20 h-20 rounded-full flex items-center justify-center font-bold text-white overflow-hidden flex-shrink-0"
+              style={{ backgroundColor: '#2a2a2a', border: '4px solid var(--post-body-bg, #1a1a1a)', fontSize: '18px' }}>
+              {user.avatarUrl
+                ? <img src={user.avatarUrl} alt="avatar" className="w-full h-full object-cover" />
+                : initials}
             </div>
             {currentUser && currentUser.id !== user.id && (
               <div className="flex items-center gap-2 mb-1">
@@ -121,6 +116,12 @@ export default function UserProfilePage() {
                 </button>
               </div>
             )}
+          </div>
+
+          {/* Name + username — below the banner on the card body, readable in both modes */}
+          <div className="mb-4">
+            <h2 className="text-xl font-bold text-white">{user.fullName || user.username}</h2>
+            <p className="text-sm mt-0.5" style={{ color: '#9ca3af' }}>@{user.username}</p>
           </div>
 
           {user.bio && <p className="text-sm mb-3" style={{ color: '#9ca3af' }}>{user.bio}</p>}
@@ -157,7 +158,7 @@ export default function UserProfilePage() {
               { label: 'Posts', value: posts.length },
               { label: 'Followers', value: followCounts?.followers ?? 0 },
               { label: 'Following', value: followCounts?.following ?? 0 },
-              { label: 'Rep', value: user.reputation ?? 0, accent: true },
+              { label: 'Reputation', value: user.reputation ?? 0, accent: true },
             ].map(({ label, value, accent }) => (
               <div key={label}>
                 <span className="font-bold text-base" style={{ color: accent ? '#a78bfa' : '#ffffff' }}>{value}</span>
