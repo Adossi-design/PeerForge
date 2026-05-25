@@ -79,99 +79,30 @@ export function NewPostModal({ onClose }: { onClose: () => void }) {
     if (form.repositoryUrl) payload.repositoryUrl = form.repositoryUrl;
     if (form.deadline) payload.deadline = new Date(form.deadline).toISOString();
 
-    // Upload attachments using Clerk token
     if (attachedFiles.length > 0) {
       try {
         const formData = new FormData();
         attachedFiles.forEach((f) => formData.append('files', f));
-        
+
         const token = await getToken();
         const headers: Record<string, string> = {};
-        if (token) {
-          headers.Authorization = `Bearer ${token}`;
-        }
-        
-        const res = await fetch(`${API_URL}/uploads`, {
-          method: 'POST',
-          body: formData,
-          headers,
-        });
+        if (token) headers.Authorization = `Bearer ${token}`;
+
+        const res = await fetch(`${API_URL}/uploads`, { method: 'POST', body: formData, headers });
         if (res.ok) {
           const data = await res.json();
           payload.attachments = data.files;
         } else {
-          console.error('Upload failed:', await res.text());
+          toast('Upload failed. Please try again.', 'error');
+          setUploading(false);
+          return;
         }
-      } catch (err) {
-        console.error('Upload error:', err);
+      } catch {
+        toast('Upload failed. Please check your connection.', 'error');
+        setUploading(false);
+        return;
       }
     }
-      // Upload attachments using Clerk token
-      if (attachedFiles.length > 0) {
-        try {
-          const formData = new FormData();
-          attachedFiles.forEach((f) => formData.append('files', f));
-        
-          const token = await getToken();
-          console.log('Token obtained:', !!token);
-          const headers: Record<string, string> = {};
-          if (token) {
-            headers.Authorization = `Bearer ${token}`;
-            console.log('Authorization header set');
-          } else {
-            console.warn('No token available, upload may fail');
-          }
-        
-          const res = await fetch(`${API_URL}/uploads`, {
-            method: 'POST',
-            body: formData,
-            headers,
-          });
-          if (res.ok) {
-            const data = await res.json();
-            payload.attachments = data.files;
-            console.log('Upload successful:', data);
-          } else {
-            const errorText = await res.text();
-            console.error('Upload failed:', res.status, errorText);
-          }
-        } catch (err) {
-          console.error('Upload error:', err);
-        }
-      }
-      // Upload attachments using Clerk token
-      if (attachedFiles.length > 0) {
-        try {
-          const formData = new FormData();
-          attachedFiles.forEach((f) => formData.append('files', f));
-        
-          const token = await getToken();
-          console.log('Token obtained:', !!token);
-          const headers: Record<string, string> = {};
-          if (token) {
-            headers.Authorization = `Bearer ${token}`;
-            console.log('Authorization header set');
-          } else {
-            console.warn('No token available, upload may fail');
-          }
-        
-          const res = await fetch(`${API_URL}/uploads`, {
-            method: 'POST',
-            body: formData,
-            headers,
-          });
-          if (res.ok) {
-            const data = await res.json();
-            payload.attachments = data.files;
-            console.log('Upload successful:', data);
-          } else {
-            const errorText = await res.text();
-            console.error('Upload failed:', res.status, errorText);
-          }
-        } catch (err) {
-          console.error('Upload error:', err);
-        }
-      }
 
     try {
       await createPost.mutateAsync(payload);
