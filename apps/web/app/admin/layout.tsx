@@ -5,11 +5,12 @@ import Link from 'next/link';
 import { usePathname, useRouter } from 'next/navigation';
 import {
   Zap, LayoutDashboard, Users, FileText, ShieldCheck,
-  LogOut, Menu, X, ChevronRight, Flag, Sun, Moon,
+  LogOut, Menu, X, ChevronRight, Flag,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { getAdminToken, useAdminLogout, useAdminReportCount } from '@/lib/hooks/useAdmin';
 import { useTheme } from '@/lib/context/ThemeContext';
+import { SidebarThemeToggle } from '@/components/common/ThemeToggle';
 
 const NAV = [
   { href: '/admin',         icon: LayoutDashboard, label: 'Dashboard' },
@@ -26,7 +27,7 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
   const pendingReports: number = reportCountData?.count ?? 0;
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [mounted, setMounted] = useState(false);
-  const { theme, toggleTheme } = useTheme();
+  const { theme } = useTheme();
 
   useEffect(() => {
     setMounted(true);
@@ -89,21 +90,30 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
                 key={href}
                 href={href}
                 onClick={() => setSidebarOpen(false)}
+                aria-current={active ? 'page' : undefined}
                 className={cn(
-                  'flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-all duration-150',
+                  'relative flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-all duration-150',
                   active ? 'text-white' : 'text-purple-200 hover:text-white hover:bg-white/10',
                 )}
                 style={active ? {
-                  background: '#3d2b8e',
-                  borderRadius: '8px',
-                  paddingLeft: '12px',
-                  transform: 'translateX(2px)',
+                  background: 'linear-gradient(90deg, #4f46e5 0%, #ec4899 100%)',
+                  borderRadius: '10px',
+                  paddingLeft: '14px',
+                  transform: 'translateX(4px)',
+                  boxShadow: '0 4px 14px rgba(236, 72, 153, 0.35), inset 0 0 0 1px rgba(255,255,255,0.08)',
                 } : {}}
                 onMouseEnter={(e) => { if (!active) (e.currentTarget as HTMLAnchorElement).style.transform = 'translateX(3px)'; }}
                 onMouseLeave={(e) => { if (!active) (e.currentTarget as HTMLAnchorElement).style.transform = 'translateX(0)'; }}
               >
+                {active && (
+                  <span
+                    aria-hidden
+                    className="absolute left-0 top-1/2 -translate-y-1/2 w-1 h-6 rounded-r-full"
+                    style={{ backgroundColor: '#ffffff' }}
+                  />
+                )}
                 <div className="relative flex-shrink-0">
-                  <Icon className={cn('w-4 h-4', active ? 'text-pink-300' : 'text-purple-300')} />
+                  <Icon className={cn('w-4 h-4', active ? 'text-white' : 'text-purple-300')} />
                   {badge > 0 && (
                     <span className="absolute -top-1.5 -right-1.5 min-w-[16px] h-4 px-1 rounded-full text-[10px] font-bold text-white flex items-center justify-center"
                       style={{ backgroundColor: '#ef4444' }}>
@@ -122,33 +132,7 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
 
         {/* Theme toggle + Logout */}
         <div className="p-4 space-y-2">
-          <button
-            onClick={toggleTheme}
-            className="w-full flex items-center justify-between px-3 py-2.5 rounded-lg text-sm font-medium transition-colors text-purple-200 hover:text-white"
-            style={{ border: '1px solid rgba(236,72,153,0.3)', backgroundColor: 'rgba(255,255,255,0.05)' }}
-          >
-            <span className="flex items-center gap-2">
-              {theme === 'dark'
-                ? <Moon className="w-4 h-4 text-indigo-300" />
-                : <Sun className="w-4 h-4 text-yellow-300" />}
-              {theme === 'dark' ? 'Dark mode' : 'Light mode'}
-            </span>
-            <div
-              className="relative flex-shrink-0 rounded-full transition-colors duration-200"
-              style={{ width: '40px', height: '22px', background: 'linear-gradient(90deg, #4f46e5, #ec4899)' }}
-            >
-              <span
-                className="absolute rounded-full transition-transform duration-200"
-                style={{
-                  top: '2px', left: '0',
-                  width: '18px', height: '18px',
-                  backgroundColor: '#ffffff',
-                  boxShadow: '0 1px 3px rgba(0,0,0,0.3)',
-                  transform: theme === 'dark' ? 'translateX(20px)' : 'translateX(2px)',
-                }}
-              />
-            </div>
-          </button>
+          <SidebarThemeToggle variant="admin" />
           <button
             onClick={logout}
             className="w-full flex items-center gap-2 px-3 py-2.5 rounded-lg text-sm font-medium transition-colors text-purple-200 hover:text-red-300"
