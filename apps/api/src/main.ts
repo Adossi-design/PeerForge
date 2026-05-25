@@ -7,9 +7,13 @@ import { join } from 'path';
 import { existsSync, mkdirSync } from 'fs';
 
 async function bootstrap() {
+  const defaultOrigins = ['http://localhost:3000', 'http://localhost:3001', 'http://localhost:3002', 'http://localhost:3003'];
+  const envOrigins = process.env.CORS_ORIGINS
+    ? process.env.CORS_ORIGINS.split(',').map((s) => s.trim()).filter(Boolean)
+    : [];
   const app = await NestFactory.create(AppModule, {
     cors: {
-      origin: ['http://localhost:3000', 'http://localhost:3001', 'http://localhost:3002', 'http://localhost:3003'],
+      origin: envOrigins.length ? envOrigins : defaultOrigins,
       credentials: true,
     },
   });
