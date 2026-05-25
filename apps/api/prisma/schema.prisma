@@ -8,6 +8,10 @@ generator client {
   provider = "prisma-client-js"
 }
 
+// NOTE: SQLite/Prisma can't enforce enums at the DB level for this project,
+// so allowed values are documented next to the field and enforced at the
+// application layer via the TS enums in `src/types.ts`. Keep them in sync.
+
 model User {
   id            String    @id @default(cuid())
   clerkId       String    @unique
@@ -66,7 +70,7 @@ model UserSkill {
   userId           String
   skill            Skill  @relation(fields: [skillId], references: [id], onDelete: Cascade)
   skillId          String
-  proficiencyLevel String @default("BEGINNER")
+  proficiencyLevel String @default("BEGINNER") // ProficiencyLevel
   endorsements     Int    @default(0)
   createdAt        DateTime @default(now())
 
@@ -79,9 +83,9 @@ model Post {
   id            String   @id @default(cuid())
   title         String
   description   String
-  type          String
-  status        String   @default("IDEATION")
-  visibility    String   @default("PUBLIC")
+  type          String              // PostType
+  status        String   @default("IDEATION")  // ProjectStatus
+  visibility    String   @default("PUBLIC")    // PostVisibility
   authorId      String
   author        User     @relation(fields: [authorId], references: [id], onDelete: Cascade)
   requiredSkills PostSkill[]
@@ -139,7 +143,7 @@ model Discussion {
   postId       String   @unique
   name         String
   description  String?
-  type         String   @default("PROJECT")
+  type         String   @default("PROJECT") // DiscussionType
   members      DiscussionMember[]
   messages     Message[]
   pinnedMessages String?
@@ -157,7 +161,7 @@ model DiscussionMember {
   discussion   Discussion @relation(fields: [discussionId], references: [id], onDelete: Cascade)
   discussionId String
   userId       String
-  role         String     @default("MEMBER")
+  role         String     @default("MEMBER") // MemberRole
   lastReadAt   DateTime   @default(now())
   joinedAt     DateTime   @default(now())
 
@@ -173,7 +177,7 @@ model Message {
   author       User       @relation(fields: [authorId], references: [id], onDelete: Cascade)
   authorId     String
   content      String
-  type         String     @default("TEXT")
+  type         String     @default("TEXT") // MessageType
   codeBlock    CodeBlock?
   reactions    Reaction[]
   isEdited     Boolean    @default(false)
@@ -245,7 +249,7 @@ model Collaboration {
   postId    String
   user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
   userId    String
-  status    String   @default("PENDING")
+  status    String   @default("PENDING") // CollaborationStatus
   message   String?
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -275,7 +279,7 @@ model Notification {
   id        String   @id @default(cuid())
   user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
   userId    String
-  type      String
+  type      String   // NotificationType
   title     String
   message   String
   link      String?
@@ -303,11 +307,11 @@ model Follow {
 model Report {
   id           String   @id @default(cuid())
   reporterId   String
-  targetType   String   // POST | COMMENT | USER
+  targetType   String   // ReportTargetType: POST | COMMENT | USER
   targetId     String
   reason       String
   details      String?
-  status       String   @default("PENDING") // PENDING | REVIEWED | DISMISSED
+  status       String   @default("PENDING") // ReportStatus: PENDING | REVIEWED | DISMISSED
   createdAt    DateTime @default(now())
 
   @@index([reporterId])
