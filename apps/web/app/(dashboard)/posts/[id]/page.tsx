@@ -10,6 +10,7 @@ import { Avatar } from '@/components/features/posts/PostCard';
 import { CollaborateButton, CollaboratorsPanel } from '@/components/features/posts/CollaborateButton';
 import { useToast } from '@/components/common/Toast';
 import { ImageLightbox } from '@/components/common/ImageLightbox';
+import { PostImageGallery } from '@/components/features/posts/PostImageGallery';
 import { ReportModal } from '@/components/common/ReportModal';
 
 const TYPE_CONFIG: Record<string, { label: string; color: string }> = {
@@ -52,7 +53,7 @@ export default function PostDetailPage() {
     e.preventDefault();
     if (!comment.trim()) return;
     try {
-      await createComment.mutateAsync({ content: comment, postId: id, userId: user?.id } as any);
+      await createComment.mutateAsync({ content: comment, postId: id });
       setComment('');
       toast('Comment posted!');
     } catch {
@@ -65,9 +66,9 @@ export default function PostDetailPage() {
 
   const type = TYPE_CONFIG[post.type] ?? TYPE_CONFIG.TECHNICAL_DISCUSSION;
   const tags = Array.isArray(post.tags) ? post.tags : [];
-  const attachments = Array.isArray((post as any).attachments) ? (post as any).attachments : [];
-  const imageAttachments = attachments.filter((a: any) => isImage(a));
-  const fileAttachments = attachments.filter((a: any) => !isImage(a));
+  const attachments = Array.isArray(post.attachments) ? post.attachments : [];
+  const imageAttachments = attachments.filter(isImage);
+  const fileAttachments = attachments.filter((a) => !isImage(a));
 
   return (
     <div className="px-4 sm:px-8 py-8 w-full mx-auto" style={{ maxWidth: '860px' }}>
@@ -78,15 +79,18 @@ export default function PostDetailPage() {
       </button>
 
       {/* Post */}
-      <div className="card rounded-2xl p-6 mb-6" style={{ backgroundColor: '#1a1a1a', border: '1px solid #242424' }}>
-        {/* Author */}
-        <div className="flex items-start justify-between mb-4">
+      <div className="card rounded-2xl mb-6 overflow-hidden" style={{ backgroundColor: 'var(--post-body-bg)', border: '1px solid var(--post-border)' }}>
+        {/* Author (header section) — distinct background */}
+        <div
+          className="flex items-start justify-between px-6 py-4"
+          style={{ backgroundColor: 'var(--post-header-bg)', borderBottom: '1px solid var(--post-border)' }}
+        >
           <div className="flex items-center gap-3">
             <Avatar name={post.author.username} avatarUrl={post.author.avatarUrl} userId={post.author.id}
               onClick={() => router.push(`/users/${post.author.id}`)} size="md" />
             <div>
               <p className="font-semibold text-sm text-white">{post.author.username}</p>
-              <p className="text-xs" style={{ color: '#6b7280' }}>
+              <p className="text-xs" style={{ color: '#9ca3af' }}>
                 {new Date(post.createdAt ?? Date.now()).toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' })}
               </p>
             </div>
@@ -94,11 +98,13 @@ export default function PostDetailPage() {
           <span className="text-xs font-medium" style={{ color: type.color }}>{type.label}</span>
         </div>
 
-        <h1 className="text-xl font-bold text-white mb-3">{post.title}</h1>
-        <p className="text-sm leading-relaxed mb-4 whitespace-pre-wrap" style={{ color: '#d1d5db' }}>{post.description}</p>
+        {/* Body section — title + description + attachments + tags */}
+        <div className="px-6 py-5" style={{ backgroundColor: 'var(--post-body-bg)' }}>
+          <h1 className="text-xl font-bold text-white mb-3">{post.title}</h1>
+          <p className="text-sm leading-relaxed mb-4 whitespace-pre-wrap" style={{ color: '#d1d5db' }}>{post.description}</p>
 
-        {/* Meta */}
-        <div className="flex flex-wrap gap-2 mb-4">
+          {/* Meta */}
+          <div className="flex flex-wrap gap-2 mb-4">
           <span className="text-xs px-2.5 py-1 rounded-full" style={{ backgroundColor: '#242424', color: '#9ca3af' }}>
             {STATUS_LABELS[post.status] ?? post.status}
           </span>
@@ -121,17 +127,8 @@ export default function PostDetailPage() {
           <div className="mb-4">
             <p className="text-xs font-semibold uppercase tracking-wider mb-2" style={{ color: '#6b7280' }}>Attachments</p>
             {imageAttachments.length > 0 && (
-              <div className="grid gap-2 mb-2" style={{ gridTemplateColumns: 'repeat(auto-fill, minmax(200px, 1fr))' }}>
-                {imageAttachments.map((a: any, i: number) => (
-                  <button
-                    key={i}
-                    onClick={() => setLightboxIndex(i)}
-                    className="block rounded-xl overflow-hidden hover:opacity-90 transition-opacity w-full"
-                    style={{ border: '1px solid #2f2f2f' }}
-                  >
-                    <img src={a.url} alt={a.name} className="w-full object-cover" style={{ maxHeight: '220px' }} />
-                  </button>
-                ))}
+              <div className="mb-2">
+                <PostImageGallery images={imageAttachments} onOpen={setLightboxIndex} rounded="xl" />
               </div>
             )}
             {fileAttachments.length > 0 && (
@@ -157,24 +154,30 @@ export default function PostDetailPage() {
           />
         )}
 
-        {/* Tags */}
-        {tags.length > 0 && (
-          <div className="flex flex-wrap gap-1.5 mb-4">
-            {tags.map((tag) => (
-              <span key={tag} className="text-xs px-2.5 py-0.5 rounded-full"
-                style={{ backgroundColor: '#1e3a5f', color: '#60a5fa', border: '1px solid #2d5a8e' }}>
-                {tag}
-              </span>
-            ))}
-          </div>
-        )}
+          {/* Tags */}
+          {tags.length > 0 && (
+            <div className="flex flex-wrap gap-1.5 mb-1">
+              {tags.map((tag) => (
+                <span key={tag} className="text-xs px-2.5 py-0.5 rounded-full"
+                  style={{ backgroundColor: '#1e3a5f', color: '#60a5fa', border: '1px solid #2d5a8e' }}>
+                  {tag}
+                </span>
+              ))}
+            </div>
+          )}
+        </div>
 
-        {/* Actions */}
-        <div className="flex items-center gap-4 pt-4 text-sm" style={{ borderTop: '1px solid #242424', color: '#6b7280' }}>
+        {/* Footer / interaction bar — distinct background, independent region */}
+        <div
+          className="flex items-center gap-4 px-6 py-3 text-sm"
+          style={{ backgroundColor: 'var(--post-footer-bg)', borderTop: '1px solid var(--post-border)', color: '#9ca3af' }}
+        >
           <button
+            type="button"
             onClick={() => likePost.mutate(post.id)}
             className="flex items-center gap-1.5 transition-colors hover:text-red-400"
-            style={{ color: post.isLiked ? '#f87171' : '#6b7280' }}
+            style={{ color: post.isLiked ? '#f87171' : '#9ca3af' }}
+            aria-label="Like"
           >
             <Heart className="w-4 h-4" fill={post.isLiked ? '#f87171' : 'none'} />
             {post._count?.likes ?? 0}
@@ -183,15 +186,18 @@ export default function PostDetailPage() {
             <MessageCircle className="w-4 h-4" />{post._count?.comments ?? 0}
           </span>
           <button
+            type="button"
             onClick={() => savePost.mutate(post.id)}
             className="flex items-center gap-1.5 transition-colors"
-            style={{ color: post.isSaved ? '#60a5fa' : '#6b7280' }}
+            style={{ color: post.isSaved ? '#60a5fa' : '#9ca3af' }}
+            aria-label="Save"
           >
             <Bookmark className="w-4 h-4" fill={post.isSaved ? '#60a5fa' : 'none'} />
             {post._count?.savedBy ?? 0}
           </button>
           <CollaborateButton postId={post.id} postAuthorId={post.author.id} />
           <button
+            type="button"
             onClick={async () => {
               const url = `${window.location.origin}/posts/${post.id}`;
               if (navigator.share) {
@@ -202,15 +208,18 @@ export default function PostDetailPage() {
               }
             }}
             className="flex items-center gap-1.5 transition-colors hover:text-white ml-auto"
-            style={{ color: '#6b7280' }}
+            style={{ color: '#9ca3af' }}
+            aria-label="Share"
           >
             <Share2 className="w-4 h-4" />Share
           </button>
           {currentUser && currentUser.id !== post.author.id && (
             <button
+              type="button"
               onClick={() => setReportTarget({ type: 'POST', id: post.id })}
               className="flex items-center gap-1.5 transition-colors hover:text-red-400"
-              style={{ color: '#6b7280' }}
+              style={{ color: '#9ca3af' }}
+              aria-label="Report"
             >
               <Flag className="w-4 h-4" />Report
             </button>
@@ -220,8 +229,11 @@ export default function PostDetailPage() {
 
       <CollaboratorsPanel postId={post.id} isAuthor={currentUser?.id === post.author.id} />
 
-      {/* Comments */}
-      <div>
+      {/* Comments — its own distinct card with own background */}
+      <div
+        className="card rounded-2xl px-5 py-5"
+        style={{ backgroundColor: 'var(--post-comment-bg)', border: '1px solid var(--post-border-subtle)' }}
+      >
         <h2 className="text-lg font-bold text-white mb-4">Comments ({comments?.length ?? 0})</h2>
 
         <form onSubmit={handleComment} className="flex gap-3 mb-6">
@@ -236,7 +248,7 @@ export default function PostDetailPage() {
               placeholder="Add a comment..."
               rows={3}
               className="w-full rounded-xl px-4 py-3 text-sm focus:outline-none resize-none"
-              style={{ backgroundColor: '#161b22', border: '1px solid #2f2f2f', color: '#d1d5db' }}
+              style={{ backgroundColor: 'var(--post-comment-item-bg)', border: '1px solid var(--post-border)', color: '#d1d5db' }}
             />
             <button
               type="submit"
@@ -255,11 +267,11 @@ export default function PostDetailPage() {
               <div key={c.id} className="flex gap-3">
                 <Avatar name={c.author.username} avatarUrl={c.author.avatarUrl} userId={c.author.id}
                   onClick={() => router.push(`/users/${c.author.id}`)} />
-                <div className="card flex-1 rounded-xl px-4 py-3" style={{ backgroundColor: '#1a1a1a', border: '1px solid #242424' }}>
+                <div className="flex-1 rounded-xl px-4 py-3" style={{ backgroundColor: 'var(--post-comment-item-bg)', border: '1px solid var(--post-border-subtle)' }}>
                   <div className="flex items-center justify-between mb-1">
                     <div className="flex items-center gap-2">
                       <span className="text-sm font-semibold text-white">{c.author.username}</span>
-                      <span className="text-xs" style={{ color: '#6b7280' }}>
+                      <span className="text-xs" style={{ color: '#9ca3af' }}>
                         {new Date(c.createdAt).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}
                       </span>
                     </div>
@@ -267,7 +279,7 @@ export default function PostDetailPage() {
                       <button
                         onClick={() => deleteComment.mutate({ commentId: c.id, postId: id })}
                         className="transition-colors hover:text-red-400"
-                        style={{ color: '#6b7280' }}
+                        style={{ color: '#9ca3af' }}
                       >
                         <Trash2 className="w-3.5 h-3.5" />
                       </button>
@@ -275,7 +287,7 @@ export default function PostDetailPage() {
                       <button
                         onClick={() => setReportTarget({ type: 'COMMENT', id: c.id })}
                         className="transition-colors hover:text-red-400"
-                        style={{ color: '#6b7280' }}
+                        style={{ color: '#9ca3af' }}
                       >
                         <Flag className="w-3.5 h-3.5" />
                       </button>
@@ -286,7 +298,7 @@ export default function PostDetailPage() {
               </div>
             ))
           ) : (
-            <p className="text-sm text-center py-8" style={{ color: '#6b7280' }}>No comments yet. Be the first!</p>
+            <p className="text-sm text-center py-8" style={{ color: '#9ca3af' }}>No comments yet. Be the first!</p>
           )}
         </div>
       </div>
