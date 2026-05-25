@@ -7,9 +7,11 @@ import {
   UseGuards,
   Req,
   BadRequestException,
+  UnauthorizedException,
 } from '@nestjs/common';
 import { AuthService } from './auth.service';
 import { AuthDto, OnboardingDto } from './dto/auth.dto';
+import { AuthenticatedRequest } from '@/common/auth-request';
 
 @Controller('auth')
 export class AuthController {
@@ -41,12 +43,12 @@ export class AuthController {
    */
   @Post('onboarding')
   async completeOnboarding(
-    @Req() req: any,
+    @Req() req: AuthenticatedRequest,
     @Body() data: OnboardingDto,
   ) {
     const userId = req.user?.id;
     if (!userId) {
-      throw new BadRequestException('User not authenticated');
+      throw new UnauthorizedException('User not authenticated');
     }
 
     const user = await this.authService.completeOnboarding(userId, data);
@@ -65,10 +67,10 @@ export class AuthController {
    * Get current authenticated user
    */
   @Get('me')
-  async getCurrentUser(@Req() req: any) {
+  async getCurrentUser(@Req() req: AuthenticatedRequest) {
     const clerkId = req.user?.sub;
     if (!clerkId) {
-      throw new BadRequestException('User not authenticated');
+      throw new UnauthorizedException('User not authenticated');
     }
 
     const user = await this.authService.getCurrentUser(clerkId);

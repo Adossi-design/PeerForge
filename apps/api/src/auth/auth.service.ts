@@ -1,12 +1,15 @@
-import { Injectable, BadRequestException, NotFoundException } from '@nestjs/common';
+import { Injectable, Logger, BadRequestException, NotFoundException } from '@nestjs/common';
 import { PrismaService } from '@/database/prisma.service';
 import { AuthDto, OnboardingDto } from './dto/auth.dto';
+import { ProficiencyLevel } from '@/types';
 import { createClerkClient } from '@clerk/backend';
 
 const clerk = createClerkClient({ secretKey: process.env.CLERK_SECRET_KEY });
 
 @Injectable()
 export class AuthService {
+  private readonly logger = new Logger(AuthService.name);
+
   constructor(private prisma: PrismaService) {}
 
   async upsertUserFromClerk(data: AuthDto) {
@@ -28,8 +31,11 @@ export class AuthService {
     if (data.skills?.length) {
       for (const skillId of data.skills) {
         await this.prisma.userSkill.create({
-          data: { userId, skillId, proficiencyLevel: 'BEGINNER' },
-        }).catch(() => {});
+          data: { userId, skillId, proficiencyLevel: ProficiencyLevel.BEGINNER },
+        }).catch((err) => {
+          // Duplicate (userId, skillId) is expected; warn for anything else
+          if (err?.code !== 'P2002') this.logger.warn(`userSkill create failed: ${err?.message}`);
+        });
       }
     }
 
@@ -76,7 +82,7 @@ export class AuthService {
             skills: { include: { skill: true } },
             _count: { select: { posts: true } },
           },
-        }) as any;
+        });
       } catch {
         return null;
       }
@@ -84,14 +90,14 @@ export class AuthService {
 
     if (!user) return null;
 
-    const skillNames = (user.skills ?? []).map((us: any) => us.skill?.name ?? '');
+    const skillNames = (user.skills ?? []).map((us) => us.skill?.name ?? '');
     let skillsFromJson: string[] = [];
-    if ((user as any).skillsJson) {
-      try { skillsFromJson = JSON.parse((user as any).skillsJson); } catch {}
+    if (user.skillsJson) {
+      try { skillsFromJson = JSON.parse(user.skillsJson); } catch {}
     }
     const finalSkills = skillsFromJson.length > 0 ? skillsFromJson : skillNames;
     let interests: string[] = [];
-    try { interests = user.interests ? JSON.parse(user.interests as string) : []; } catch {}
+    try { interests = user.interests ? JSON.parse(user.interests) : []; } catch {}
 
     return {
       id: user.id,
@@ -105,13 +111,13 @@ export class AuthService {
       country: user.country,
       githubUrl: user.githubUrl,
       portfolioUrl: user.portfolioUrl,
-      linkedinUrl: (user as any).linkedinUrl,
+      linkedinUrl: user.linkedinUrl,
       skills: finalSkills,
       interests,
       reputation: user.reputation,
       isVerified: user.isVerified,
       createdAt: user.createdAt,
-      _count: (user as any)._count,
+      _count: user._count,
     };
   }
 }
